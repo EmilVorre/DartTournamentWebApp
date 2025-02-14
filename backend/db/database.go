@@ -12,9 +12,12 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-	dsn := fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	// Use Docker service name `db` as the MySQL hostname
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASS"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
 		os.Getenv("DB_NAME"),
 	)
 
