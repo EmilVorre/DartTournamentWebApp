@@ -49,14 +49,16 @@ pub fn set_finals_match_winner(
 }
 
 /// Apply win/loss for a single playoff match to player stats.
+/// Takes team ids and winner so we don't hold a reference into tournament while mutating it.
 fn apply_playoff_match_result(
     tournament: &mut Tournament,
-    m: &GameMatch,
+    team_1: &[PlayerId],
+    team_2: &[PlayerId],
     winner: Team,
 ) -> Result<(), TournamentError> {
     let (winner_ids, loser_ids) = match winner {
-        Team::One => (m.team_1.as_slice(), m.team_2.as_slice()),
-        Team::Two => (m.team_2.as_slice(), m.team_1.as_slice()),
+        Team::One => (team_1, team_2),
+        Team::Two => (team_2, team_1),
     };
     for &pid in loser_ids {
         tournament
@@ -87,10 +89,14 @@ pub fn process_semi_final_results(tournament: &mut Tournament) -> Result<(), Tou
         }
     }
 
-    // Apply playoff win/loss to player stats before snapshot
-    for m in &tournament.matches {
-        let w = tournament.final_match_results[&m.id];
-        apply_playoff_match_result(tournament, m, w)?;
+    // Apply playoff win/loss to player stats before snapshot (copy match data to avoid borrow conflict)
+    let match_data: Vec<_> = tournament
+        .matches
+        .iter()
+        .map(|m| (m.team_1.clone(), m.team_2.clone(), tournament.final_match_results[&m.id]))
+        .collect();
+    for (team_1, team_2, w) in match_data {
+        apply_playoff_match_result(tournament, &team_1, &team_2, w)?;
     }
 
     tournament.bracket_semi_final_players = Some(tournament.players.clone());
@@ -136,18 +142,19 @@ pub fn process_finals_results(tournament: &mut Tournament) -> Result<(), Tournam
     if tournament.matches.len() != 1 {
         return Err(TournamentError::InvalidState);
     }
-    let m = &tournament.matches[0];
+    let team_1 = tournament.matches[0].team_1.clone();
+    let team_2 = tournament.matches[0].team_2.clone();
     let w = tournament
         .final_match_results
-        .get(&m.id)
+        .get(&tournament.matches[0].id)
         .copied()
         .ok_or(TournamentError::IncompleteResults)?;
 
-    apply_playoff_match_result(tournament, m, w)?;
+    apply_playoff_match_result(tournament, &team_1, &team_2, w)?;
 
     let winner_ids: Vec<PlayerId> = match w {
-        Team::One => m.team_1.clone(),
-        Team::Two => m.team_2.clone(),
+        Team::One => team_1,
+        Team::Two => team_2,
     };
 
     tournament.bracket_finals_match = Some(tournament.matches[0].clone());
@@ -181,14 +188,15 @@ pub fn process_grand_finals_results(tournament: &mut Tournament) -> Result<(), T
     if tournament.matches.len() != 1 {
         return Err(TournamentError::InvalidState);
     }
-    let m = &tournament.matches[0];
+    let team_1 = tournament.matches[0].team_1.clone();
+    let team_2 = tournament.matches[0].team_2.clone();
     let w = tournament
         .final_match_results
-        .get(&m.id)
+        .get(&tournament.matches[0].id)
         .copied()
         .ok_or(TournamentError::IncompleteResults)?;
 
-    apply_playoff_match_result(tournament, m, w)?;
+    apply_playoff_match_result(tournament, &team_1, &team_2, w)?;
 
     tournament.state = TournamentState::Completed;
     Ok(())
