@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-# Project lives at /opt/dart — change if your path is different (e.g. /opt/DartTournementWebApp)
-WorkingDirectory=/opt/DartTournementWebApp
+# Project lives at /opt/dart — change if your path is different (e.g. /opt/DartTournamentWebApp)
+WorkingDirectory=/opt/DartTournamentWebApp
 ExecStart=/opt/dart/target/release/web
 
 # Listen on all interfaces, port 8080 (override with HOST/PORT if needed)
