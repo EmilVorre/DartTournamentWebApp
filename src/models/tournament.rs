@@ -209,6 +209,7 @@ impl Tournament {
     }
 
     /// Manually eliminate a player (GroupPlay or FinalSelection). Moves them from active to eliminated_players.
+    /// If 8 or fewer active players remain after elimination, transitions to FinalSelection (ready for semi-finals).
     pub fn eliminate_player(&mut self, player_id: PlayerId) -> Result<(), TournamentError> {
         if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection {
             return Err(TournamentError::InvalidState);
@@ -225,6 +226,9 @@ impl Tournament {
         self.players.retain(|x| x.id != player_id);
         self.unused_players.retain(|x| x.id != player_id);
         self.eliminated_players.push(p);
+        if self.players.len() + self.unused_players.len() <= 8 {
+            self.state = TournamentState::FinalSelection;
+        }
         Ok(())
     }
 
