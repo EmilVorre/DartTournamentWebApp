@@ -1,0 +1,31 @@
+[Unit]
+Description=Dart Tournament Web App
+After=network.target
+
+[Service]
+Type=simple
+# Project lives at /opt/dart — change if your path is different (e.g. /opt/DartTournementWebApp)
+WorkingDirectory=/opt/dart
+ExecStart=/opt/dart/target/release/web
+
+# Listen on all interfaces, port 8080 (override with HOST/PORT if needed)
+Environment=HOST=0.0.0.0
+Environment=PORT=8080
+
+# Run as unprivileged user (recommended). Create with:
+#   sudo useradd -r -s /bin/false dart-web
+#   sudo chown -R dart-web:dart-web /opt/dart
+User=dart-web
+Group=dart-web
+# To run as root instead, comment out User/Group above (not recommended).
+
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dart-tournament-web
+
+[Install]
+WantedBy=multi-user.target
