@@ -62,10 +62,8 @@ pub enum TournamentState {
     FinalSelection,
     /// 8 players; semi-finals (2 matches, 2v2).
     SemiFinals,
-    /// 4 players; finals (1 match, 2v2).
+    /// 4 players; finals (1 match, 2v2). Submitting completes the tournament (two winners).
     Finals,
-    /// 2 players; grand finals (1 match, 1v1).
-    GrandFinals,
     /// Tournament finished; show winners and stats.
     Completed,
 }
@@ -95,7 +93,7 @@ pub struct Tournament {
     pub bracket_semi_final_matches: Option<Vec<GameMatch>>,
     /// Bracket display: semi-final results.
     pub bracket_semi_final_results: Option<HashMap<MatchId, Team>>,
-    /// Bracket display: finals match (when in GrandFinals or Completed).
+    /// Bracket display: finals match (when in Finals or Completed).
     pub bracket_finals_match: Option<GameMatch>,
     /// Bracket display: finals result.
     pub bracket_finals_result: Option<Team>,
@@ -145,9 +143,10 @@ impl Tournament {
         })
     }
 
-    /// Add a player (only valid in Setup). Names must be unique (case-insensitive).
+    /// Add a player (valid in Setup, GroupPlay, or FinalSelection). Names must be unique (case-insensitive).
     pub fn add_player(&mut self, name: impl Into<String>) -> Result<(), TournamentError> {
-        if self.state != TournamentState::Setup {
+        use TournamentState::*;
+        if !matches!(self.state, Setup | GroupPlay | FinalSelection) {
             return Err(TournamentError::InvalidState);
         }
         let name = name.into();
@@ -190,16 +189,20 @@ impl Tournament {
     }
 
     /// Set a player's loss count manually (GroupPlay or FinalSelection). Player must be active (in players or unused_players).
+    /// When no matches have been generated yet, we do not set eliminated=true so that "Generate matches" still has enough players.
     pub fn set_player_losses(&mut self, player_id: PlayerId, losses: u32) -> Result<(), TournamentError> {
         if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection {
             return Err(TournamentError::InvalidState);
         }
         let max_losses = self.max_losses;
+        let has_matches = !self.matches.is_empty();
         let p = self
             .get_player_mut_any(player_id)
             .ok_or(TournamentError::PlayerNotFound(player_id))?;
         p.losses = losses;
-        if p.losses >= max_losses {
+        // Only mark eliminated once at least one round has been generated; otherwise editing losses
+        // before the first "Generate matches" would shrink the pool and block generating matches.
+        if has_matches && p.losses >= max_losses {
             p.eliminated = true;
         }
         Ok(())

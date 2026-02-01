@@ -11,7 +11,7 @@ use actix_web::{
 };
 use dart_tournament_web::{
     add_players_back_from_last_eliminated, generate_group_play_matches, generate_semi_final_matches,
-    process_finals_results, process_grand_finals_results, process_group_play_results,
+    process_finals_results, process_group_play_results,
     process_semi_final_results, set_finals_match_winner, start_semi_finals, start_tournament,
     Team, Tournament, TournamentId,
 };
@@ -414,7 +414,7 @@ async fn api_finals_set_winner(
     }
 }
 
-/// Submit current final round and advance (semi → finals, finals → grand, grand → completed).
+/// Submit current final round (semi → finals, finals → completed).
 #[post("/api/tournaments/{id}/finals/submit")]
 async fn api_finals_submit(state: AppState, path: Path<TournamentPath>) -> HttpResponse {
     let mut g = match state.write() {
@@ -430,7 +430,6 @@ async fn api_finals_submit(state: AppState, path: Path<TournamentPath>) -> HttpR
     let result = match t.state {
         dart_tournament_web::TournamentState::SemiFinals => process_semi_final_results(t),
         dart_tournament_web::TournamentState::Finals => process_finals_results(t),
-        dart_tournament_web::TournamentState::GrandFinals => process_grand_finals_results(t),
         _ => Err(dart_tournament_web::TournamentError::InvalidState),
     };
     match result {

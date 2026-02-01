@@ -1,4 +1,4 @@
-//! Final rounds: semi-finals, finals, grand finals (single-elimination bracket).
+//! Final rounds: semi-finals and finals (single-elimination bracket). Tournament ends after finals with two winners.
 
 use crate::models::{
     GameMatch, MatchId, PlayerId, RoundType, Team, Tournament, TournamentError, TournamentState,
@@ -35,7 +35,7 @@ pub fn generate_semi_final_matches(tournament: &mut Tournament) -> Result<(), To
     Ok(())
 }
 
-/// Set winner for a final-round match (semi, finals, or grand finals).
+/// Set winner for a final-round match (semi or finals).
 pub fn set_finals_match_winner(
     tournament: &mut Tournament,
     match_id: MatchId,
@@ -134,7 +134,7 @@ pub fn process_semi_final_results(tournament: &mut Tournament) -> Result<(), Tou
     Ok(())
 }
 
-/// Process finals result: advance 2 winners to GrandFinals, generate grand final match.
+/// Process finals result: tournament completed (two winners from the winning team).
 pub fn process_finals_results(tournament: &mut Tournament) -> Result<(), TournamentError> {
     if tournament.state != TournamentState::Finals {
         return Err(TournamentError::InvalidState);
@@ -152,52 +152,10 @@ pub fn process_finals_results(tournament: &mut Tournament) -> Result<(), Tournam
 
     apply_playoff_match_result(tournament, &team_1, &team_2, w)?;
 
-    let winner_ids: Vec<PlayerId> = match w {
-        Team::One => team_1,
-        Team::Two => team_2,
-    };
-
     tournament.bracket_finals_match = Some(tournament.matches[0].clone());
     tournament.bracket_finals_result = Some(w);
     tournament.matches.clear();
     tournament.final_match_results.clear();
-
-    let advancing: Vec<_> = tournament
-        .players
-        .iter()
-        .filter(|p| winner_ids.contains(&p.id))
-        .cloned()
-        .collect();
-    tournament.players = advancing;
-
-    let p = &tournament.players;
-    tournament.matches = vec![GameMatch::new(
-        vec![p[0].id],
-        vec![p[1].id],
-        RoundType::GrandFinals,
-    )];
-    tournament.state = TournamentState::GrandFinals;
-    Ok(())
-}
-
-/// Process grand finals result: tournament completed.
-pub fn process_grand_finals_results(tournament: &mut Tournament) -> Result<(), TournamentError> {
-    if tournament.state != TournamentState::GrandFinals {
-        return Err(TournamentError::InvalidState);
-    }
-    if tournament.matches.len() != 1 {
-        return Err(TournamentError::InvalidState);
-    }
-    let team_1 = tournament.matches[0].team_1.clone();
-    let team_2 = tournament.matches[0].team_2.clone();
-    let w = tournament
-        .final_match_results
-        .get(&tournament.matches[0].id)
-        .copied()
-        .ok_or(TournamentError::IncompleteResults)?;
-
-    apply_playoff_match_result(tournament, &team_1, &team_2, w)?;
-
     tournament.state = TournamentState::Completed;
     Ok(())
 }

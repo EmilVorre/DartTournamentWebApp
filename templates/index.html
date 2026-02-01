@@ -177,6 +177,9 @@
             <button type="button" id="eliminate-player-btn" class="w-full px-6 py-3 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 whitespace-nowrap">
               <i class="fas fa-user-minus mr-2"></i> Eliminate player
             </button>
+            <button type="button" id="group-play-add-player-btn" class="w-full px-6 py-3 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-user-plus mr-2"></i> Add player
+            </button>
             <button type="button" id="restart-tournament-btn" class="w-full px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap">
               <i class="fas fa-redo mr-2"></i> Restart tournament
             </button>
@@ -187,7 +190,7 @@
         </div>
       </section>
 
-      <!-- Bracket view (semi-finals → finals → grand final), light theme -->
+      <!-- Bracket view (semi-finals → finals), light theme -->
       <section id="bracket-view" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
         <div id="bracket-error" class="hidden flex-shrink-0 mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
         <div class="flex-shrink-0 mb-3 flex items-center gap-3">
@@ -198,7 +201,7 @@
             <i class="fas fa-check mr-1"></i> Submit results
           </button>
         </div>
-        <!-- Bracket only (no stats table in semi/finals/grand finals) -->
+        <!-- Bracket only (no stats table in semi/finals) -->
         <div class="flex-1 min-h-0 overflow-hidden">
           <div id="bracket-container" class="min-h-0 overflow-auto flex items-center justify-center p-4">
             <div class="flex items-center gap-2">
@@ -215,21 +218,10 @@
                   </div>
                 </div>
               </div>
-              <!-- Finals: 1 box -->
+              <!-- Finals: 1 box (tournament ends here with two winners) -->
               <div id="bracket-finals-col" class="flex flex-col justify-center shrink-0">
                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Finals</h3>
                 <div id="bracket-finals-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
-              </div>
-              <!-- Straight line: finals → grand -->
-              <div id="bracket-connector-grand" class="flex flex-col justify-center shrink-0 self-center" aria-hidden="true">
-                <svg width="24" height="40" viewBox="0 0 24 40" class="text-slate-300 shrink-0">
-                  <path d="M0 20 L24 20" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <!-- Grand final: 1 box -->
-              <div id="bracket-grand-wrapper" class="flex flex-col justify-center shrink-0">
-                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Grand Final</h3>
-                <div id="bracket-grand-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
               </div>
             </div>
           </div>
@@ -256,15 +248,6 @@
               <div id="end-bracket-finals-col" class="flex flex-col justify-center shrink-0">
                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Finals</h3>
                 <div id="end-bracket-finals-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
-              </div>
-              <div class="flex flex-col justify-center shrink-0 self-center" aria-hidden="true">
-                <svg width="24" height="40" viewBox="0 0 24 40" class="text-slate-300 shrink-0">
-                  <path d="M0 20 L24 20" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <div id="end-bracket-grand-wrapper" class="flex flex-col justify-center shrink-0">
-                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Grand Final</h3>
-                <div id="end-bracket-grand-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
               </div>
             </div>
           </div>
@@ -335,6 +318,18 @@
           <div class="flex gap-3 justify-end">
             <button type="button" id="eliminate-player-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
             <button type="button" id="eliminate-player-confirm-btn" class="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Eliminate</button>
+          </div>
+        </div>
+      </div>
+      <!-- Add player (group play) modal -->
+      <div id="add-player-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-hidden="true">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4">Add player</h3>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Player name</label>
+          <input type="text" id="add-player-modal-name" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 focus:ring-2 focus:ring-sky-500 focus:border-sky-500" placeholder="Enter name" />
+          <div class="flex gap-3 justify-end">
+            <button type="button" id="add-player-modal-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" id="add-player-modal-confirm" class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Add</button>
           </div>
         </div>
       </div>
@@ -759,8 +754,7 @@
       document.getElementById('main-container').classList.add('h-screen', 'max-h-screen');
 
       const headerSub = document.getElementById('header-subtitle');
-      if (tournament.state === 'grand_finals') headerSub.textContent = 'Grand final – pick the champion.';
-      else if (tournament.state === 'finals') headerSub.textContent = 'Finals – pick the two grand finalists.';
+      if (tournament.state === 'finals') headerSub.textContent = 'Finals – pick the two winners.';
       else headerSub.textContent = 'Final bracket – generate semi-final matches to start.';
 
       const state = tournament.state;
@@ -821,7 +815,7 @@
       }
 
       const finalsEl = document.getElementById('bracket-finals-match');
-      if (finalsMatch && (state === 'finals' || state === 'grand_finals' || state === 'completed')) {
+      if (finalsMatch && (state === 'finals' || state === 'completed')) {
         const t1 = (finalsMatch.team_1 || []).map(getName).join(' & ');
         const t2 = (finalsMatch.team_2 || []).map(getName).join(' & ');
         const fw = finalsResult || (state === 'finals' && results[finalsMatch.id]);
@@ -840,36 +834,6 @@
         `;
       } else {
         finalsEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">Winners advance</div>';
-      }
-
-      const grandEl = document.getElementById('bracket-grand-match');
-      if (state === 'grand_finals' || state === 'completed') {
-        const gm = currentMatches.length >= 1 ? currentMatches[0] : null;
-        if (gm) {
-          const t1 = (gm.team_1 || []).map(getName).join(' & ');
-          const t2 = (gm.team_2 || []).map(getName).join(' & ');
-          const gw = results[gm.id];
-          const t1W = gw === 'one';
-          const t2W = gw === 'two';
-          const readOnly = isCompleted;
-          grandEl.innerHTML = `
-            <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t1W ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${gm.id}" data-team="one" ${readOnly ? 'disabled' : ''}>
-              <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
-              ${t1W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
-            </button>
-            <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t2W ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${gm.id}" data-team="two" ${readOnly ? 'disabled' : ''}>
-              <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
-              ${t2W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
-            </button>
-          `;
-        } else {
-          grandEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
-        }
-      } else {
-        grandEl.innerHTML = `
-          <div class="px-3 py-2 text-slate-500 text-sm text-center border-b border-slate-200">Winner</div>
-          <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
-        `;
       }
 
       const allHaveWinner = currentMatches.length > 0 && currentMatches.every((m) => results[m.id]);
@@ -953,29 +917,6 @@
         `;
       } else {
         endFinalsEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
-      }
-
-      // Populate read-only grand final
-      const endGrandEl = document.getElementById('end-bracket-grand-match');
-      const gm = currentMatches.length >= 1 ? currentMatches[0] : null;
-      if (gm) {
-        const t1 = (gm.team_1 || []).map(getName).join(' & ');
-        const t2 = (gm.team_2 || []).map(getName).join(' & ');
-        const gw = results[gm.id];
-        const t1W = gw === 'one';
-        const t2W = gw === 'two';
-        endGrandEl.innerHTML = `
-          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t1W ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
-            <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
-            ${t1W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
-          </div>
-          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t2W ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
-            <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
-            ${t2W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
-          </div>
-        `;
-      } else {
-        endGrandEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
       }
 
       // Populate All Players table
@@ -1140,7 +1081,7 @@
           renderGroupPlay(t);
         } else if (t.state === 'completed') {
           renderEndTournament(t);
-        } else if (t.state === 'semi_finals' || t.state === 'finals' || t.state === 'grand_finals') {
+        } else if (t.state === 'semi_finals' || t.state === 'finals') {
           renderBracket(t);
         } else {
           document.getElementById('setup-view').classList.add('hidden');
@@ -1446,6 +1387,36 @@
       } catch (err) {
         showGroupPlayError(err.message || 'Failed to add players back');
       }
+    });
+
+    document.getElementById('group-play-add-player-btn').addEventListener('click', () => {
+      document.getElementById('add-player-modal-name').value = '';
+      document.getElementById('add-player-modal').classList.remove('hidden');
+      document.getElementById('add-player-modal').setAttribute('aria-hidden', 'false');
+      setTimeout(() => document.getElementById('add-player-modal-name').focus(), 50);
+    });
+
+    document.getElementById('add-player-modal-cancel').addEventListener('click', () => {
+      document.getElementById('add-player-modal').classList.add('hidden');
+      document.getElementById('add-player-modal').setAttribute('aria-hidden', 'true');
+    });
+
+    document.getElementById('add-player-modal-confirm').addEventListener('click', async () => {
+      const name = document.getElementById('add-player-modal-name').value.trim();
+      if (!name) return;
+      clearGroupPlayError();
+      try {
+        await API.addPlayer(name);
+        document.getElementById('add-player-modal').classList.add('hidden');
+        document.getElementById('add-player-modal').setAttribute('aria-hidden', 'true');
+        await loadAndRender();
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to add player');
+      }
+    });
+
+    document.getElementById('add-player-modal-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('add-player-modal-confirm').click();
     });
 
     document.getElementById('bracket-generate-btn').addEventListener('click', async () => {

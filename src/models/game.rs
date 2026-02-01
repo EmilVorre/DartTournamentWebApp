@@ -23,14 +23,13 @@ pub enum RoundType {
     GroupPlay,
     SemiFinals,
     Finals,
-    GrandFinals,
 }
 
-/// A single match: two teams (usually 2v2, or 1v1 in grand finals).
+/// A single match: two teams (2v2 in group/semi/finals).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GameMatch {
     pub id: MatchId,
-    /// Team 1 player IDs (2 for 2v2, 1 for 1v1 grand finals).
+    /// Team 1 player IDs (2 for 2v2).
     pub team_1: Vec<PlayerId>,
     /// Team 2 player IDs.
     pub team_2: Vec<PlayerId>,
