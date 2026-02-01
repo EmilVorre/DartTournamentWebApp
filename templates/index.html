@@ -793,7 +793,7 @@
           const team2Win = w === 'two';
           const readOnly = state !== 'semi_finals' || isCompleted;
           return `
-            <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200" data-match-id="${m.id}">
+            <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200" data-match-id="${m.id}">
               <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${team1Win ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${m.id}" data-team="one" ${readOnly ? 'disabled' : ''}>
                 <span class="text-slate-400 w-5 text-xs">${seeds[i * 2]}</span>
                 <span class="whitespace-nowrap">${escapeHtml(team1Names)}</span>
@@ -809,11 +809,11 @@
         }).join('');
       } else {
         semiEl.innerHTML = `
-          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+          <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200">
             <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 1</div>
             <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+          <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200">
             <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 2</div>
             <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
           </div>
@@ -907,7 +907,7 @@
           const team1Win = w === 'one';
           const team2Win = w === 'two';
           return `
-            <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+            <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200">
               <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${team1Win ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
                 <span class="text-slate-400 w-5 text-xs">${seeds[i * 2]}</span>
                 <span class="whitespace-nowrap">${escapeHtml(team1Names)}</span>
@@ -923,11 +923,11 @@
         }).join('');
       } else {
         endSemiEl.innerHTML = `
-          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+          <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200">
             <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 1</div>
             <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+          <div class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200">
             <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 2</div>
             <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
           </div>

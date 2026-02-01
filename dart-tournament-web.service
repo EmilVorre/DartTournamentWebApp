@@ -12,15 +12,9 @@ ExecStart=/opt/DartTournamentWebApp/target/release/web
 Environment=HOST=0.0.0.0
 Environment=PORT=8080
 
-# Run as unprivileged user (recommended). Create with:
-#   sudo useradd -r -s /bin/false dart-web
-#   sudo chown -R dart-web:dart-web /opt/DartTournamentWebApp
-User=dart-web
-Group=dart-web
 # If you get status=203/EXEC: binary missing or not executable. Fix:
 #   1. Build: cargo build --release --bin web
 #   2. chmod +x /opt/DartTournamentWebApp/target/release/web
-#   3. Or run as root temporarily: comment out User/Group above to test.
 
 Restart=always
 RestartSec=5
