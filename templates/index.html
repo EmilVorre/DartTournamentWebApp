@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dart Tournament</title>
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col">
+  <div class="container mx-auto px-4 py-4 max-w-4xl flex flex-col flex-1 min-h-0" id="main-container">
+    <header class="flex-shrink-0 mb-4">
+      <h1 class="text-3xl font-bold text-slate-800 flex items-center gap-2">
+        <i class="fas fa-bullseye text-sky-500"></i>
+        Dart Tournament
+      </h1>
+      <p class="text-slate-600 mt-1" id="header-subtitle">Setup players and start the tournament.</p>
+    </header>
+
+    <main class="flex-1 flex flex-col min-h-0" id="main-content">
+      <!-- Setup view (when state is "setup") -->
+      <section id="setup-view" class="space-y-6">
+        <!-- Ensure tournament exists / create one -->
+        <div id="setup-error" class="hidden p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+
+        <div class="p-6 rounded-xl bg-white shadow border border-slate-200">
+          <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-users text-sky-500"></i>
+            Players
+          </h2>
+          <div class="flex gap-2 mb-4">
+            <input
+              type="text"
+              id="player-name-input"
+              placeholder="Player name"
+              class="flex-1 min-w-[20ch] rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              maxlength="100"
+            />
+            <button
+              type="button"
+              id="add-player-btn"
+              class="px-4 py-2 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+            >
+              <i class="fas fa-plus mr-1"></i> Add Player
+            </button>
+          </div>
+          <ul id="player-list" class="divide-y divide-slate-200 rounded-lg border border-slate-200 overflow-hidden">
+            <!-- Filled by JS -->
+          </ul>
+          <p class="text-slate-500 text-sm mt-2">Need at least 8 players to start.</p>
+        </div>
+
+        <div class="p-6 rounded-xl bg-white shadow border border-slate-200">
+          <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-heart-crack text-sky-500"></i>
+            Max losses before elimination
+          </h2>
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              id="max-losses-input"
+              min="1"
+              max="10"
+              value="3"
+              class="w-20 rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500"
+            />
+            <button
+              type="button"
+              id="set-max-losses-btn"
+              class="px-4 py-2 rounded-lg bg-slate-600 text-white font-medium hover:bg-slate-700 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+            >
+              Set
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-4">
+          <button
+            type="button"
+            id="start-tournament-btn"
+            class="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i class="fas fa-play mr-2"></i> Start Tournament
+          </button>
+        </div>
+      </section>
+
+      <!-- Group play view (state is group_play or final_selection) -->
+      <section id="group-play-view" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div id="group-play-error" class="hidden flex-shrink-0 mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+
+        <!-- Final selection: select players to rejoin when &lt; 8 remain -->
+        <div id="final-selection-panel" class="hidden flex-shrink-0 mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+          <p class="font-medium mb-2" id="final-selection-message"></p>
+          <div id="final-selection-checkboxes" class="space-y-2 mb-4"></div>
+          <button type="button" id="add-back-btn" class="px-4 py-2 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-user-plus mr-1"></i> Add selected and continue
+          </button>
+        </div>
+        <!-- Shown when 8 players in final selection (ready for semi-finals) -->
+        <div id="final-selection-ready-banner" class="hidden flex-shrink-0 mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+          <p class="font-medium mb-3"><i class="fas fa-check-circle mr-2"></i>8 players – ready for semi-finals.</p>
+          <button type="button" id="continue-to-semi-btn" class="px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+            <i class="fas fa-arrow-right mr-1"></i> Continue to semi-finals
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(38rem,1fr)_minmax(auto,1.3fr)_auto] gap-6 flex-1 min-h-0 overflow-visible">
+          <!-- Left: active players – fills column height, table body scrolls (no page scroll) -->
+          <div class="flex flex-col min-h-0 rounded-xl bg-white shadow border border-slate-200 overflow-hidden min-w-0">
+            <h2 class="flex-shrink-0 text-xl font-semibold text-slate-800 p-4 pb-2 flex items-center gap-2">
+              <i class="fas fa-users text-sky-500"></i>
+              Active players
+            </h2>
+            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-4 pb-4" id="active-players-scroll">
+              <table class="w-full text-sm min-w-[min(100%,38rem)]">
+                <thead>
+                  <tr class="bg-sky-100 text-slate-800 font-semibold sticky top-0 z-10 text-base">
+                    <th class="text-left px-6 py-4 rounded-tl min-w-[28ch]">Name</th>
+                    <th class="text-left px-6 py-4 w-24">Losses</th>
+                    <th class="text-left px-6 py-4 w-24">Wins</th>
+                    <th class="text-left px-6 py-4 rounded-tr w-24">Sat out</th>
+                  </tr>
+                </thead>
+                <tbody id="group-play-players-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right: matches (space for 8), sit out (space for 3), rest = eliminated – wide enough for full names -->
+          <div class="flex flex-col gap-4 min-h-0 min-w-0">
+            <!-- Matches: height for 8 matches, scroll if more -->
+            <div class="flex-shrink-0 p-4 rounded-xl bg-white shadow border border-slate-200 flex flex-col max-h-[26rem] min-h-[12rem]">
+              <h2 class="text-xl font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                <i class="fas fa-trophy text-sky-500"></i>
+                Matches
+              </h2>
+              <div id="group-play-matches-area" class="flex-1 min-h-0 overflow-y-auto overflow-x-visible min-w-0">
+                <p id="no-matches-msg" class="text-slate-500 text-sm mb-2">Generate matches to start the round.</p>
+                <div id="matches-container" class="hidden space-y-4"></div>
+              </div>
+            </div>
+
+            <!-- Sitting out: fixed space for 3 people -->
+            <div class="flex-shrink-0 p-4 rounded-xl bg-white shadow border border-slate-200 h-[10rem] flex flex-col overflow-hidden">
+              <h3 class="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                <i class="fas fa-pause text-slate-500"></i>
+                Sitting out this round
+              </h3>
+              <ul id="sit-out-list" class="text-sm text-slate-600 space-y-0.5 overflow-x-auto overflow-y-hidden flex-1 min-h-0"></ul>
+            </div>
+
+            <!-- Eliminated: takes remaining space, scrolls if many -->
+            <div class="flex-1 min-h-0 flex flex-col rounded-xl bg-white shadow border border-slate-200 overflow-hidden">
+              <h3 class="font-semibold text-slate-800 p-4 pb-2 flex items-center gap-2 flex-shrink-0">
+                <i class="fas fa-user-minus text-red-500"></i>
+                Eliminated
+              </h3>
+              <ul id="eliminated-list" class="text-sm text-slate-600 space-y-1 p-4 pt-0 overflow-y-auto overflow-x-auto flex-1 min-h-0"></ul>
+            </div>
+          </div>
+
+          <!-- Far right: action buttons (same width) -->
+          <div class="flex flex-col gap-4 justify-start pt-12 w-56">
+            <button type="button" id="generate-matches-btn" class="w-full px-6 py-3 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-random mr-2"></i> Generate Matches
+            </button>
+            <button type="button" id="submit-results-btn" class="w-full px-6 py-3 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+              <i class="fas fa-check mr-2"></i> Submit Results
+            </button>
+            <button type="button" id="edit-losses-btn" class="w-full px-6 py-3 rounded-lg bg-slate-600 text-white font-medium hover:bg-slate-700 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-edit mr-2"></i> Edit losses
+            </button>
+            <button type="button" id="eliminate-player-btn" class="w-full px-6 py-3 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-user-minus mr-2"></i> Eliminate player
+            </button>
+            <button type="button" id="restart-tournament-btn" class="w-full px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-redo mr-2"></i> Restart tournament
+            </button>
+            <button type="button" id="end-tournament-btn" class="w-full px-6 py-3 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 whitespace-nowrap">
+              <i class="fas fa-stop mr-2"></i> End tournament
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bracket view (semi-finals → finals → grand final), light theme -->
+      <section id="bracket-view" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div id="bracket-error" class="hidden flex-shrink-0 mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+        <div class="flex-shrink-0 mb-3 flex items-center gap-3">
+          <button type="button" id="bracket-generate-btn" class="hidden px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+            <i class="fas fa-random mr-1"></i> Generate semi-final matches
+          </button>
+          <button type="button" id="bracket-submit-btn" class="hidden px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-check mr-1"></i> Submit results
+          </button>
+        </div>
+        <!-- Bracket only (no stats table in semi/finals/grand finals) -->
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <div id="bracket-container" class="min-h-0 overflow-auto flex items-center justify-center p-4">
+            <div class="flex items-center gap-2">
+              <!-- Semi-finals: 2 boxes stacked + Y connector -->
+              <div id="bracket-semi" class="flex flex-col shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Semi-Finals</h3>
+                <div class="flex items-stretch gap-0">
+                  <div id="bracket-semi-matches" class="flex flex-col gap-2 shrink-0"></div>
+                  <!-- Y connector -->
+                  <div class="flex flex-col w-8 shrink-0 self-stretch" aria-hidden="true">
+                    <svg width="32" height="100%" class="text-slate-300 block" viewBox="0 0 32 100" preserveAspectRatio="none" style="min-height: 90px;">
+                      <path d="M0 25 L16 25 L16 50 L32 50 M0 75 L16 75 L16 50" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <!-- Finals: 1 box -->
+              <div id="bracket-finals-col" class="flex flex-col justify-center shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Finals</h3>
+                <div id="bracket-finals-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
+              </div>
+              <!-- Straight line: finals → grand -->
+              <div id="bracket-connector-grand" class="flex flex-col justify-center shrink-0 self-center" aria-hidden="true">
+                <svg width="24" height="40" viewBox="0 0 24 40" class="text-slate-300 shrink-0">
+                  <path d="M0 20 L24 20" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <!-- Grand final: 1 box -->
+              <div id="bracket-grand-wrapper" class="flex flex-col justify-center shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Grand Final</h3>
+                <div id="bracket-grand-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- End tournament view (completed): bracket left 2/3, All Players stats right 1/3 -->
+      <section id="end-tournament-view" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div class="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 overflow-hidden">
+          <!-- Left 2/3: Read-only bracket -->
+          <div class="min-h-0 overflow-auto flex items-center justify-center p-4">
+            <div class="flex items-center gap-2">
+              <div id="end-bracket-semi" class="flex flex-col shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Semi-Finals</h3>
+                <div class="flex items-stretch gap-0">
+                  <div id="end-bracket-semi-matches" class="flex flex-col gap-2 shrink-0"></div>
+                  <div class="flex flex-col w-8 shrink-0 self-stretch" aria-hidden="true">
+                    <svg width="32" height="100%" class="text-slate-300 block" viewBox="0 0 32 100" preserveAspectRatio="none" style="min-height: 90px;">
+                      <path d="M0 25 L16 25 L16 50 L32 50 M0 75 L16 75 L16 50" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div id="end-bracket-finals-col" class="flex flex-col justify-center shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Finals</h3>
+                <div id="end-bracket-finals-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
+              </div>
+              <div class="flex flex-col justify-center shrink-0 self-center" aria-hidden="true">
+                <svg width="24" height="40" viewBox="0 0 24 40" class="text-slate-300 shrink-0">
+                  <path d="M0 20 L24 20" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div id="end-bracket-grand-wrapper" class="flex flex-col justify-center shrink-0">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Grand Final</h3>
+                <div id="end-bracket-grand-match" class="rounded-lg border border-slate-200 bg-white shadow min-w-[220px] overflow-hidden divide-y divide-slate-200"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Right 1/3: All Players stats table with auto-scroll + Reset / Restart buttons -->
+          <div class="min-h-0 rounded-xl bg-white shadow border border-slate-200 overflow-hidden flex flex-col">
+            <h3 class="flex-shrink-0 text-base font-semibold text-slate-800 p-4 pb-3 flex items-center gap-2 border-b border-slate-100">
+              <i class="fas fa-users text-sky-500"></i>
+              All Players
+            </h3>
+            <div class="flex-1 min-h-0 overflow-y-auto px-4 pb-4" id="end-bracket-players-scroll">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="bg-sky-50 text-slate-700 font-semibold sticky top-0 z-10">
+                    <th class="text-left px-3 py-2.5 rounded-tl">Name</th>
+                    <th class="text-center px-3 py-2.5 w-14">L</th>
+                    <th class="text-center px-3 py-2.5 w-14">W</th>
+                    <th class="text-center px-3 py-2.5 rounded-tr w-14">Sat</th>
+                  </tr>
+                </thead>
+                <tbody id="end-bracket-players-tbody"></tbody>
+              </table>
+            </div>
+            <div class="flex-shrink-0 p-4 pt-0 flex flex-col gap-3">
+              <button type="button" id="end-panel-restart-btn" class="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm">
+                <i class="fas fa-redo mr-2"></i> Restart tournament
+              </button>
+              <button type="button" id="end-panel-reset-btn" class="w-full px-4 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 text-sm">
+                <i class="fas fa-stop mr-2"></i> Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Confirm modal (Eliminate / Restart / End tournament) -->
+      <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 id="confirm-modal-title" class="text-lg font-semibold text-slate-800 mb-2"></h3>
+          <p id="confirm-modal-message" class="text-slate-600 mb-6"></p>
+          <div class="flex gap-3 justify-end">
+            <button type="button" id="confirm-modal-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" id="confirm-modal-ok" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit losses modal -->
+      <div id="edit-losses-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4">Edit losses</h3>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Player</label>
+          <select id="edit-losses-player" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"></select>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Losses</label>
+          <input type="number" id="edit-losses-value" min="0" max="99" value="0" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-6 focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
+          <div class="flex gap-3 justify-end">
+            <button type="button" id="edit-losses-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" id="edit-losses-save" class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Eliminate player: first choose player (same modal style or inline). We use confirm modal after selecting player. -->
+      <div id="eliminate-player-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4">Eliminate player</h3>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Choose player to eliminate</label>
+          <select id="eliminate-player-select" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-6 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></select>
+          <div class="flex gap-3 justify-end">
+            <button type="button" id="eliminate-player-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" id="eliminate-player-confirm-btn" class="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Eliminate</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let activePlayersScrollRafId = null;
+    let activePlayersScrollTimeoutId = null;
+    let activePlayersAutoScrollStarted = false;
+
+    const TOURNAMENT_ID_KEY = 'dart_tournament_id';
+
+    function getTournamentId() {
+      return localStorage.getItem(TOURNAMENT_ID_KEY);
+    }
+    function setTournamentId(id) {
+      if (id) localStorage.setItem(TOURNAMENT_ID_KEY, id);
+      else localStorage.removeItem(TOURNAMENT_ID_KEY);
+    }
+
+    const API = {
+      async createTournament(maxLosses = 3) {
+        const res = await fetch('/api/tournaments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ max_losses: maxLosses }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const t = await res.json();
+        setTournamentId(t.id);
+        return t;
+      },
+      async getTournament() {
+        const id = getTournamentId();
+        if (!id) return null;
+        const res = await fetch(`/api/tournaments/${id}`);
+        if (res.status === 404) {
+          setTournamentId(null);
+          return null;
+        }
+        if (!res.ok) throw new Error(await res.text());
+        const t = await res.json();
+        setTournamentId(t.id);
+        return t;
+      },
+      async addPlayer(name) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/players`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async removePlayer(playerId) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/players/${playerId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async setMaxLosses(maxLosses) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/max-losses`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ max_losses: maxLosses }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async startTournament() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/start`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async generateMatches() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/matches/generate`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async setMatchWinner(matchId, team) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/matches/winner`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ match_id: matchId, team }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async submitMatchResults() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/matches/submit`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async setPlayerLosses(playerId, losses) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/players/${playerId}/losses`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ losses }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async eliminatePlayer(playerId) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/players/${playerId}/eliminate`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async restartTournament() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/restart`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async addBackFromLastEliminated(playerIds) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/final-selection/add-back`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player_ids: playerIds }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async startSemiFinals() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/final-selection/start-semi`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async generateFinalsMatches() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/finals/matches`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async setFinalsWinner(matchId, team) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/finals/winner`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ match_id: matchId, team }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+      async submitFinals() {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/finals/submit`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
+      },
+    };
+
+    function showError(msg) {
+      const el = document.getElementById('setup-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+    function clearError() {
+      document.getElementById('setup-error').classList.add('hidden');
+    }
+    function showGroupPlayError(msg) {
+      const el = document.getElementById('group-play-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+    function clearGroupPlayError() {
+      document.getElementById('group-play-error').classList.add('hidden');
+    }
+    function showBracketError(msg) {
+      const el = document.getElementById('bracket-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+    function clearBracketError() {
+      document.getElementById('bracket-error').classList.add('hidden');
+    }
+
+    function renderPlayerList(players) {
+      const ul = document.getElementById('player-list');
+      if (!players || players.length === 0) {
+        ul.innerHTML = '<li class="px-4 py-3 text-slate-500 text-sm">No players yet. Add one above.</li>';
+        return;
+      }
+      ul.innerHTML = players.map((p) => `
+        <li class="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <span class="font-medium text-slate-800 min-w-[20ch]">${escapeHtml(p.name)}</span>
+          <button type="button" class="remove-player text-red-600 hover:text-red-700 p-1" data-id="${p.id}" title="Remove">
+            <i class="fas fa-times"></i>
+          </button>
+        </li>
+      `).join('');
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function renderSetup(tournament) {
+      document.getElementById('setup-view').classList.remove('hidden');
+      document.getElementById('group-play-view').classList.add('hidden');
+      document.getElementById('bracket-view').classList.add('hidden');
+      document.getElementById('end-tournament-view').classList.add('hidden');
+      document.getElementById('header-subtitle').textContent = 'Setup players and start the tournament.';
+      document.getElementById('max-losses-input').value = tournament.max_losses;
+      renderPlayerList(tournament.players);
+      document.body.classList.remove('overflow-hidden');
+      document.getElementById('main-container').classList.remove('h-screen', 'max-h-screen');
+      activePlayersAutoScrollStarted = false;
+    }
+
+    function playerNameLookup(tournament) {
+      const map = {};
+      for (const p of (tournament.players || [])) map[p.id] = p.name;
+      for (const p of (tournament.unused_players || [])) map[p.id] = p.name;
+      for (const p of (tournament.eliminated_players || [])) map[p.id] = p.name;
+      return (id) => map[id] || '?';
+    }
+
+    function renderGroupPlay(tournament) {
+      document.getElementById('setup-view').classList.add('hidden');
+      document.getElementById('group-play-view').classList.remove('hidden');
+      document.getElementById('bracket-view').classList.add('hidden');
+      document.getElementById('end-tournament-view').classList.add('hidden');
+      document.getElementById('main-container').classList.remove('max-w-4xl', 'max-w-5xl', 'max-w-6xl', 'max-w-7xl');
+      document.getElementById('main-container').classList.add('max-w-[120rem]');
+      document.getElementById('header-subtitle').textContent = tournament.state === 'final_selection'
+        ? 'Select players to rejoin until 8 remain, then continue to semi-finals.'
+        : 'Group play – generate matches and submit results.';
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('main-container').classList.add('h-screen', 'max-h-screen');
+
+      const isFinalSelection = tournament.state === 'final_selection';
+      const playerCount = tournament.players ? tournament.players.length : 0;
+      const needToSelect = 8 - playerCount;
+      const lastEliminated = tournament.last_eliminated_players || [];
+
+      document.getElementById('generate-matches-btn').classList.toggle('hidden', isFinalSelection);
+
+      const finalPanel = document.getElementById('final-selection-panel');
+      const readyBanner = document.getElementById('final-selection-ready-banner');
+      if (isFinalSelection && playerCount < 8) {
+        finalPanel.classList.remove('hidden');
+        readyBanner.classList.add('hidden');
+        document.getElementById('final-selection-message').textContent =
+          `Select ${needToSelect} player${needToSelect === 1 ? '' : 's'} from the last eliminated to rejoin (need 8 total).`;
+        const checkboxesEl = document.getElementById('final-selection-checkboxes');
+        if (lastEliminated.length === 0) {
+          checkboxesEl.innerHTML = '<p class="text-sm text-amber-700">No last eliminated players to select.</p>';
+        } else {
+          checkboxesEl.innerHTML = lastEliminated.map((p) => `
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" class="final-selection-cb rounded border-amber-400 text-amber-600 focus:ring-amber-500" data-player-id="${p.id}" />
+              <span class="min-w-[20ch]">${escapeHtml(p.name)}</span>
+            </label>
+          `).join('');
+        }
+        const addBackBtn = document.getElementById('add-back-btn');
+        addBackBtn.disabled = true;
+        addBackBtn.dataset.needed = String(needToSelect);
+      } else if (isFinalSelection && playerCount === 8) {
+        finalPanel.classList.add('hidden');
+        readyBanner.classList.remove('hidden');
+      } else {
+        finalPanel.classList.add('hidden');
+        readyBanner.classList.add('hidden');
+      }
+
+      const players = tournament.players || [];
+      const tbody = document.getElementById('group-play-players-tbody');
+      if (players.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-slate-500 text-base">No active players.</td></tr>';
+      } else {
+        tbody.innerHTML = players.map((p, i) => `
+          <tr class="${i % 2 === 0 ? 'bg-slate-50' : ''} text-base">
+            <td class="px-6 py-4 font-medium text-slate-800 min-w-[28ch]">${escapeHtml(p.name)}</td>
+            <td class="px-6 py-4">${p.losses}</td>
+            <td class="px-6 py-4">${p.wins}</td>
+            <td class="px-6 py-4">${p.times_sat_out}</td>
+          </tr>
+        `).join('');
+      }
+
+      const unused = tournament.unused_players || [];
+      const sitOutEl = document.getElementById('sit-out-list');
+      sitOutEl.innerHTML = unused.length === 0
+        ? '<li class="text-slate-400 min-w-[20ch]">None</li>'
+        : unused.map((p) => `<li class="min-w-[36ch] break-words">${escapeHtml(p.name)}</li>`).join('');
+
+      const eliminated = tournament.eliminated_players || [];
+      const eliminatedEl = document.getElementById('eliminated-list');
+      eliminatedEl.innerHTML = eliminated.length === 0
+        ? '<li class="text-slate-400 min-w-[20ch]">None</li>'
+        : eliminated.map((p) => `<li class="min-w-[36ch] break-words">${escapeHtml(p.name)}</li>`).join('');
+
+      const matches = tournament.matches || [];
+      const matchResults = tournament.match_results || {};
+      const getName = playerNameLookup(tournament);
+
+      document.getElementById('no-matches-msg').classList.toggle('hidden', matches.length > 0);
+      document.getElementById('matches-container').classList.toggle('hidden', matches.length === 0);
+
+      const container = document.getElementById('matches-container');
+      if (matches.length > 0) {
+        container.innerHTML = matches.map((m, idx) => {
+          const team1Names = (m.team_1 || []).map(getName).join(' & ');
+          const team2Names = (m.team_2 || []).map(getName).join(' & ');
+          const winner = matchResults[m.id];
+          const team1Win = winner === 'one';
+          const team2Win = winner === 'two';
+          const matchNum = idx + 1;
+          return `
+            <div class="flex items-center gap-3" data-match-id="${m.id}">
+              <span class="text-lg font-bold text-slate-500 w-8 text-right shrink-0">${matchNum}</span>
+              <div class="border border-slate-200 rounded-lg overflow-hidden flex-1">
+                <div class="grid grid-cols-2 divide-x divide-slate-200">
+                  <button type="button" class="match-team px-4 py-5 text-center text-base font-medium transition-colors flex items-center justify-center gap-2 ${team1Win ? 'bg-emerald-100 text-emerald-800' : 'bg-white hover:bg-slate-50 text-slate-800'}" data-match-id="${m.id}" data-team="one">
+                    <span class="whitespace-nowrap">${escapeHtml(team1Names)}</span>
+                    ${team1Win ? '<i class="fas fa-trophy text-emerald-600 shrink-0"></i>' : ''}
+                  </button>
+                  <button type="button" class="match-team px-4 py-5 text-center text-base font-medium transition-colors flex items-center justify-center gap-2 ${team2Win ? 'bg-emerald-100 text-emerald-800' : 'bg-white hover:bg-slate-50 text-slate-800'}" data-match-id="${m.id}" data-team="two">
+                    <span class="whitespace-nowrap">${escapeHtml(team2Names)}</span>
+                    ${team2Win ? '<i class="fas fa-trophy text-emerald-600 shrink-0"></i>' : ''}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const allHaveWinner = matches.length > 0 && matches.every((m) => matchResults[m.id]);
+      const submitBtn = document.getElementById('submit-results-btn');
+      submitBtn.disabled = !allHaveWinner;
+    }
+
+    function bracketNameLookup(tournament) {
+      const map = {};
+      for (const p of (tournament.players || [])) map[p.id] = p.name;
+      for (const p of (tournament.bracket_semi_final_players || [])) map[p.id] = p.name;
+      return (id) => map[id] || '?';
+    }
+
+    function renderBracket(tournament) {
+      document.getElementById('setup-view').classList.add('hidden');
+      document.getElementById('group-play-view').classList.add('hidden');
+      document.getElementById('end-tournament-view').classList.add('hidden');
+      document.getElementById('bracket-view').classList.remove('hidden');
+      document.getElementById('main-container').classList.remove('max-w-4xl', 'max-w-5xl', 'max-w-6xl', 'max-w-7xl', 'max-w-[96rem]', 'max-w-[120rem]');
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('main-container').classList.add('h-screen', 'max-h-screen');
+
+      const headerSub = document.getElementById('header-subtitle');
+      if (tournament.state === 'grand_finals') headerSub.textContent = 'Grand final – pick the champion.';
+      else if (tournament.state === 'finals') headerSub.textContent = 'Finals – pick the two grand finalists.';
+      else headerSub.textContent = 'Final bracket – generate semi-final matches to start.';
+
+      const state = tournament.state;
+      const getName = bracketNameLookup(tournament);
+      const results = tournament.final_match_results || {};
+      const semiMatches = tournament.bracket_semi_final_matches || tournament.matches || [];
+      const semiResults = tournament.bracket_semi_final_results || results;
+      const finalsMatch = tournament.bracket_finals_match || (tournament.matches && tournament.matches[0]) || null;
+      const finalsResult = tournament.bracket_finals_result || (finalsMatch && results[finalsMatch.id]);
+      const currentMatches = tournament.matches || [];
+
+      document.getElementById('bracket-error').classList.add('hidden');
+
+      const genBtn = document.getElementById('bracket-generate-btn');
+      const subBtn = document.getElementById('bracket-submit-btn');
+      const isCompleted = state === 'completed';
+      const needGenerate = state === 'semi_finals' && currentMatches.length === 0;
+      const hasMatchesToSubmit = currentMatches.length > 0;
+      genBtn.classList.toggle('hidden', !needGenerate);
+      subBtn.classList.toggle('hidden', isCompleted || !hasMatchesToSubmit);
+
+      const semiEl = document.getElementById('bracket-semi-matches');
+      const seeds = [1, 4, 3, 2];
+      if (semiMatches.length >= 2) {
+        semiEl.innerHTML = semiMatches.map((m, i) => {
+          const team1Names = (m.team_1 || []).map(getName).join(' & ');
+          const team2Names = (m.team_2 || []).map(getName).join(' & ');
+          const w = semiResults[m.id];
+          const team1Win = w === 'one';
+          const team2Win = w === 'two';
+          const readOnly = state !== 'semi_finals' || isCompleted;
+          return `
+            <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200" data-match-id="${m.id}">
+              <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${team1Win ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${m.id}" data-team="one" ${readOnly ? 'disabled' : ''}>
+                <span class="text-slate-400 w-5 text-xs">${seeds[i * 2]}</span>
+                <span class="whitespace-nowrap">${escapeHtml(team1Names)}</span>
+                ${team1Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+              </button>
+              <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${team2Win ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${m.id}" data-team="two" ${readOnly ? 'disabled' : ''}>
+                <span class="text-slate-400 w-5 text-xs">${seeds[i * 2 + 1]}</span>
+                <span class="whitespace-nowrap">${escapeHtml(team2Names)}</span>
+                ${team2Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+              </button>
+            </div>
+          `;
+        }).join('');
+      } else {
+        semiEl.innerHTML = `
+          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 1</div>
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 2</div>
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
+          </div>
+        `;
+      }
+
+      const finalsEl = document.getElementById('bracket-finals-match');
+      if (finalsMatch && (state === 'finals' || state === 'grand_finals' || state === 'completed')) {
+        const t1 = (finalsMatch.team_1 || []).map(getName).join(' & ');
+        const t2 = (finalsMatch.team_2 || []).map(getName).join(' & ');
+        const fw = finalsResult || (state === 'finals' && results[finalsMatch.id]);
+        const t1Win = fw === 'one';
+        const t2Win = fw === 'two';
+        const readOnly = state !== 'finals' || isCompleted;
+        finalsEl.innerHTML = `
+          <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t1Win ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${finalsMatch.id}" data-team="one" ${readOnly ? 'disabled' : ''}>
+            <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
+            ${t1Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </button>
+          <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t2Win ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${finalsMatch.id}" data-team="two" ${readOnly ? 'disabled' : ''}>
+            <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
+            ${t2Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </button>
+        `;
+      } else {
+        finalsEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">Winners advance</div>';
+      }
+
+      const grandEl = document.getElementById('bracket-grand-match');
+      if (state === 'grand_finals' || state === 'completed') {
+        const gm = currentMatches.length >= 1 ? currentMatches[0] : null;
+        if (gm) {
+          const t1 = (gm.team_1 || []).map(getName).join(' & ');
+          const t2 = (gm.team_2 || []).map(getName).join(' & ');
+          const gw = results[gm.id];
+          const t1W = gw === 'one';
+          const t2W = gw === 'two';
+          const readOnly = isCompleted;
+          grandEl.innerHTML = `
+            <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t1W ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${gm.id}" data-team="one" ${readOnly ? 'disabled' : ''}>
+              <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
+              ${t1W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+            </button>
+            <button type="button" class="bracket-team w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors flex items-center gap-1.5 ${t2W ? 'bg-emerald-50 text-emerald-800' : ''}" data-match-id="${gm.id}" data-team="two" ${readOnly ? 'disabled' : ''}>
+              <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
+              ${t2W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+            </button>
+          `;
+        } else {
+          grandEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
+        }
+      } else {
+        grandEl.innerHTML = `
+          <div class="px-3 py-2 text-slate-500 text-sm text-center border-b border-slate-200">Winner</div>
+          <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
+        `;
+      }
+
+      const allHaveWinner = currentMatches.length > 0 && currentMatches.every((m) => results[m.id]);
+      subBtn.disabled = !allHaveWinner;
+    }
+
+    function renderEndTournament(tournament) {
+      document.getElementById('setup-view').classList.add('hidden');
+      document.getElementById('group-play-view').classList.add('hidden');
+      document.getElementById('bracket-view').classList.add('hidden');
+      document.getElementById('end-tournament-view').classList.remove('hidden');
+      document.getElementById('main-container').classList.remove('max-w-4xl', 'max-w-5xl', 'max-w-6xl', 'max-w-7xl', 'max-w-[96rem]', 'max-w-[120rem]');
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('main-container').classList.add('h-screen', 'max-h-screen');
+
+      const headerSub = document.getElementById('header-subtitle');
+      headerSub.textContent = 'Tournament completed.';
+
+      const getName = bracketNameLookup(tournament);
+      const results = tournament.final_match_results || {};
+      const semiMatches = tournament.bracket_semi_final_matches || tournament.matches || [];
+      const semiResults = tournament.bracket_semi_final_results || results;
+      const finalsMatch = tournament.bracket_finals_match || (tournament.matches && tournament.matches[0]) || null;
+      const finalsResult = tournament.bracket_finals_result || (finalsMatch && results[finalsMatch.id]);
+      const currentMatches = tournament.matches || [];
+      const seeds = [1, 4, 3, 2];
+
+      // Populate read-only semi-finals
+      const endSemiEl = document.getElementById('end-bracket-semi-matches');
+      if (semiMatches.length >= 2) {
+        endSemiEl.innerHTML = semiMatches.map((m, i) => {
+          const team1Names = (m.team_1 || []).map(getName).join(' & ');
+          const team2Names = (m.team_2 || []).map(getName).join(' & ');
+          const w = semiResults[m.id];
+          const team1Win = w === 'one';
+          const team2Win = w === 'two';
+          return `
+            <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+              <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${team1Win ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+                <span class="text-slate-400 w-5 text-xs">${seeds[i * 2]}</span>
+                <span class="whitespace-nowrap">${escapeHtml(team1Names)}</span>
+                ${team1Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+              </div>
+              <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${team2Win ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+                <span class="text-slate-400 w-5 text-xs">${seeds[i * 2 + 1]}</span>
+                <span class="whitespace-nowrap">${escapeHtml(team2Names)}</span>
+                ${team2Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        endSemiEl.innerHTML = `
+          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 1</div>
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white shadow overflow-hidden divide-y divide-slate-200">
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">Semi-final 2</div>
+            <div class="px-3 py-2 text-slate-500 text-sm text-center">—</div>
+          </div>
+        `;
+      }
+
+      // Populate read-only finals
+      const endFinalsEl = document.getElementById('end-bracket-finals-match');
+      if (finalsMatch) {
+        const t1 = (finalsMatch.team_1 || []).map(getName).join(' & ');
+        const t2 = (finalsMatch.team_2 || []).map(getName).join(' & ');
+        const t1Win = finalsResult === 'one';
+        const t2Win = finalsResult === 'two';
+        endFinalsEl.innerHTML = `
+          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t1Win ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+            <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
+            ${t1Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </div>
+          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t2Win ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+            <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
+            ${t2Win ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </div>
+        `;
+      } else {
+        endFinalsEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
+      }
+
+      // Populate read-only grand final
+      const endGrandEl = document.getElementById('end-bracket-grand-match');
+      const gm = currentMatches.length >= 1 ? currentMatches[0] : null;
+      if (gm) {
+        const t1 = (gm.team_1 || []).map(getName).join(' & ');
+        const t2 = (gm.team_2 || []).map(getName).join(' & ');
+        const gw = results[gm.id];
+        const t1W = gw === 'one';
+        const t2W = gw === 'two';
+        endGrandEl.innerHTML = `
+          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t1W ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+            <span class="whitespace-nowrap">${escapeHtml(t1)}</span>
+            ${t1W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </div>
+          <div class="w-full px-3 py-2 text-left text-sm font-medium flex items-center gap-1.5 ${t2W ? 'bg-emerald-50 text-emerald-800' : 'text-slate-800'}">
+            <span class="whitespace-nowrap">${escapeHtml(t2)}</span>
+            ${t2W ? '<i class="fas fa-trophy text-emerald-600 ml-auto text-xs"></i>' : ''}
+          </div>
+        `;
+      } else {
+        endGrandEl.innerHTML = '<div class="px-3 py-4 text-slate-500 text-sm text-center">—</div>';
+      }
+
+      // Populate All Players table
+      const allPlayers = [
+        ...(tournament.players || []),
+        ...(tournament.bracket_semi_final_players || []),
+        ...(tournament.eliminated_players || []),
+      ];
+      const seen = new Set();
+      const uniquePlayers = allPlayers.filter(p => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
+      uniquePlayers.sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
+
+      const endTbody = document.getElementById('end-bracket-players-tbody');
+      if (uniquePlayers.length === 0) {
+        endTbody.innerHTML = '<tr><td colspan="4" class="px-3 py-3 text-slate-500 text-sm">No players.</td></tr>';
+      } else {
+        endTbody.innerHTML = uniquePlayers.map((p, i) => `
+          <tr class="${i % 2 === 0 ? 'bg-slate-50' : ''}">
+            <td class="px-3 py-2 text-slate-800">${escapeHtml(p.name)}</td>
+            <td class="px-3 py-2 text-center">${p.losses}</td>
+            <td class="px-3 py-2 text-center">${p.wins}</td>
+            <td class="px-3 py-2 text-center">${p.times_sat_out}</td>
+          </tr>
+        `).join('');
+      }
+
+      startEndBracketPlayersAutoScroll();
+    }
+
+    let bracketPlayersScrollRafId = null;
+    let bracketPlayersScrollTimeoutId = null;
+    let endBracketPlayersScrollRafId = null;
+    let endBracketPlayersScrollTimeoutId = null;
+
+    function startBracketPlayersAutoScroll() {
+      if (bracketPlayersScrollRafId != null) cancelAnimationFrame(bracketPlayersScrollRafId);
+      if (bracketPlayersScrollTimeoutId != null) clearTimeout(bracketPlayersScrollTimeoutId);
+      bracketPlayersScrollRafId = null;
+      bracketPlayersScrollTimeoutId = null;
+
+      const el = document.getElementById('bracket-players-scroll');
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+
+      const scrollDurationMs = 12000;
+      let startTime = null;
+
+      function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / scrollDurationMs, 1);
+        el.scrollTop = progress * maxScroll;
+
+        if (progress < 1) {
+          bracketPlayersScrollRafId = requestAnimationFrame(step);
+        } else {
+          bracketPlayersScrollRafId = null;
+          bracketPlayersScrollTimeoutId = setTimeout(() => {
+            bracketPlayersScrollTimeoutId = null;
+            el.scrollTop = 0;
+            startBracketPlayersAutoScroll();
+          }, 4000);
+        }
+      }
+
+      bracketPlayersScrollRafId = requestAnimationFrame(step);
+    }
+
+    function startEndBracketPlayersAutoScroll() {
+      if (endBracketPlayersScrollRafId != null) cancelAnimationFrame(endBracketPlayersScrollRafId);
+      if (endBracketPlayersScrollTimeoutId != null) clearTimeout(endBracketPlayersScrollTimeoutId);
+      endBracketPlayersScrollRafId = null;
+      endBracketPlayersScrollTimeoutId = null;
+
+      const el = document.getElementById('end-bracket-players-scroll');
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+
+      const scrollDurationMs = 12000;
+      let startTime = null;
+
+      function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / scrollDurationMs, 1);
+        el.scrollTop = progress * maxScroll;
+
+        if (progress < 1) {
+          endBracketPlayersScrollRafId = requestAnimationFrame(step);
+        } else {
+          endBracketPlayersScrollRafId = null;
+          endBracketPlayersScrollTimeoutId = setTimeout(() => {
+            endBracketPlayersScrollTimeoutId = null;
+            el.scrollTop = 0;
+            startEndBracketPlayersAutoScroll();
+          }, 4000);
+        }
+      }
+
+      endBracketPlayersScrollRafId = requestAnimationFrame(step);
+    }
+
+    function startActivePlayersAutoScroll() {
+      if (activePlayersScrollRafId != null) cancelAnimationFrame(activePlayersScrollRafId);
+      if (activePlayersScrollTimeoutId != null) clearTimeout(activePlayersScrollTimeoutId);
+      activePlayersScrollRafId = null;
+      activePlayersScrollTimeoutId = null;
+
+      const el = document.getElementById('active-players-scroll');
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+
+      const scrollDurationMs = 24000;
+      let startTime = null;
+
+      function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / scrollDurationMs, 1);
+        el.scrollTop = progress * maxScroll;
+
+        if (progress < 1) {
+          activePlayersScrollRafId = requestAnimationFrame(step);
+        } else {
+          activePlayersScrollRafId = null;
+          activePlayersScrollTimeoutId = setTimeout(() => {
+            activePlayersScrollTimeoutId = null;
+            el.scrollTop = 0;
+            startActivePlayersAutoScroll();
+          }, 8000);
+        }
+      }
+
+      activePlayersScrollRafId = requestAnimationFrame(step);
+    }
+
+    async function ensureTournament() {
+      let t = await API.getTournament();
+      if (!t) {
+        t = await API.createTournament(3);
+      }
+      return t;
+    }
+
+    async function loadAndRender() {
+      clearError();
+      clearGroupPlayError();
+      try {
+        const t = await ensureTournament();
+        if (t.state === 'setup') {
+          document.getElementById('main-container').classList.remove('max-w-5xl', 'max-w-6xl', 'max-w-7xl', 'max-w-[96rem]', 'max-w-[120rem]');
+          document.getElementById('main-container').classList.add('max-w-4xl');
+          renderSetup(t);
+        } else if (t.state === 'group_play' || t.state === 'final_selection') {
+          renderGroupPlay(t);
+        } else if (t.state === 'completed') {
+          renderEndTournament(t);
+        } else if (t.state === 'semi_finals' || t.state === 'finals' || t.state === 'grand_finals') {
+          renderBracket(t);
+        } else {
+          document.getElementById('setup-view').classList.add('hidden');
+          document.getElementById('group-play-view').classList.add('hidden');
+          document.getElementById('bracket-view').classList.add('hidden');
+          document.getElementById('end-tournament-view').classList.add('hidden');
+          document.getElementById('main-container').classList.add('max-w-6xl');
+        }
+      } catch (e) {
+        showError(e.message || 'Failed to load tournament');
+      }
+    }
+
+    document.getElementById('add-player-btn').addEventListener('click', async () => {
+      const input = document.getElementById('player-name-input');
+      const name = input.value.trim();
+      if (!name) return;
+      clearError();
+      try {
+        const t = await API.addPlayer(name);
+        input.value = '';
+        renderSetup(t);
+      } catch (e) {
+        showError(e.message || 'Failed to add player');
+      }
+    });
+
+    document.getElementById('player-name-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('add-player-btn').click();
+    });
+
+    document.getElementById('player-list').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.remove-player');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      if (!id) return;
+      clearError();
+      try {
+        const t = await API.removePlayer(id);
+        renderSetup(t);
+      } catch (err) {
+        showError(err.message || 'Failed to remove player');
+      }
+    });
+
+    document.getElementById('set-max-losses-btn').addEventListener('click', async () => {
+      const input = document.getElementById('max-losses-input');
+      const val = parseInt(input.value, 10);
+      if (isNaN(val) || val < 1 || val > 10) {
+        showError('Max losses must be between 1 and 10');
+        return;
+      }
+      clearError();
+      try {
+        const t = await API.setMaxLosses(val);
+        renderSetup(t);
+      } catch (err) {
+        showError(err.message || 'Failed to set max losses');
+      }
+    });
+
+    document.getElementById('start-tournament-btn').addEventListener('click', async () => {
+      clearError();
+      try {
+        const t = await API.startTournament();
+        renderGroupPlay(t);
+      } catch (err) {
+        showError(err.message || 'Failed to start tournament');
+      }
+    });
+
+    document.getElementById('generate-matches-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      try {
+        const t = await API.generateMatches();
+        renderGroupPlay(t);
+        startActivePlayersAutoScroll();
+        activePlayersAutoScrollStarted = true;
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to generate matches');
+      }
+    });
+
+    document.getElementById('matches-container').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.match-team');
+      if (!btn) return;
+      const matchId = btn.getAttribute('data-match-id');
+      const team = btn.getAttribute('data-team');
+      if (!matchId || !team) return;
+      clearGroupPlayError();
+      try {
+        const t = await API.setMatchWinner(matchId, team);
+        renderGroupPlay(t);
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to set winner');
+      }
+    });
+
+    document.getElementById('submit-results-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      try {
+        const t = await API.submitMatchResults();
+        renderGroupPlay(t);
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to submit results');
+      }
+    });
+
+    // Confirm modal (reusable for Eliminate / Restart / End)
+    let confirmModalResolve = null;
+    document.getElementById('confirm-modal-cancel').addEventListener('click', () => {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      if (typeof confirmModalResolve === 'function') {
+        confirmModalResolve(false);
+        confirmModalResolve = null;
+      }
+    });
+    document.getElementById('confirm-modal-ok').addEventListener('click', () => {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      if (typeof confirmModalResolve === 'function') {
+        confirmModalResolve(true);
+        confirmModalResolve = null;
+      }
+    });
+    function showConfirm(title, message) {
+      return new Promise((resolve) => {
+        document.getElementById('confirm-modal-title').textContent = title;
+        document.getElementById('confirm-modal-message').textContent = message;
+        document.getElementById('confirm-modal').classList.remove('hidden');
+        confirmModalResolve = resolve;
+      });
+    }
+
+    // Edit losses
+    document.getElementById('edit-losses-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      try {
+        const t = await API.getTournament();
+        if (!t || (t.state !== 'group_play' && t.state !== 'final_selection')) return;
+        const active = [...(t.players || []), ...(t.unused_players || [])];
+        window._editLossesPlayers = active;
+        const sel = document.getElementById('edit-losses-player');
+        sel.innerHTML = active.map((p) => `<option value="${p.id}">${escapeHtml(p.name)} (${p.losses} losses)</option>`).join('');
+        if (active.length > 0) {
+          const first = active[0];
+          sel.value = first.id;
+          document.getElementById('edit-losses-value').value = first.losses;
+        }
+        document.getElementById('edit-losses-modal').classList.remove('hidden');
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to load players');
+      }
+    });
+    document.getElementById('edit-losses-player').addEventListener('change', () => {
+      const active = window._editLossesPlayers;
+      if (!active) return;
+      const sel = document.getElementById('edit-losses-player');
+      const id = sel.value;
+      const p = active.find((x) => x.id === id);
+      if (p) document.getElementById('edit-losses-value').value = p.losses;
+    });
+    document.getElementById('edit-losses-cancel').addEventListener('click', () => {
+      document.getElementById('edit-losses-modal').classList.add('hidden');
+    });
+    document.getElementById('edit-losses-save').addEventListener('click', async () => {
+      const playerId = document.getElementById('edit-losses-player').value;
+      const losses = parseInt(document.getElementById('edit-losses-value').value, 10);
+      if (isNaN(losses) || losses < 0) return;
+      clearGroupPlayError();
+      try {
+        const t = await API.setPlayerLosses(playerId, losses);
+        document.getElementById('edit-losses-modal').classList.add('hidden');
+        renderGroupPlay(t);
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to update losses');
+      }
+    });
+
+    // Eliminate player: choose player then confirm
+    document.getElementById('eliminate-player-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      try {
+        const t = await API.getTournament();
+        if (!t || (t.state !== 'group_play' && t.state !== 'final_selection')) return;
+        const active = [...(t.players || []), ...(t.unused_players || [])];
+        const sel = document.getElementById('eliminate-player-select');
+        sel.innerHTML = active.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+        document.getElementById('eliminate-player-modal').classList.remove('hidden');
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to load players');
+      }
+    });
+    document.getElementById('eliminate-player-cancel').addEventListener('click', () => {
+      document.getElementById('eliminate-player-modal').classList.add('hidden');
+    });
+    document.getElementById('eliminate-player-confirm-btn').addEventListener('click', async () => {
+      const sel = document.getElementById('eliminate-player-select');
+      const playerId = sel.value;
+      const playerName = sel.options[sel.selectedIndex]?.textContent || 'this player';
+      document.getElementById('eliminate-player-modal').classList.add('hidden');
+      const ok = await showConfirm('Eliminate player', `Are you sure you want to eliminate ${playerName}? They will be moved to the eliminated list.`);
+      if (!ok) return;
+      clearGroupPlayError();
+      try {
+        const t = await API.eliminatePlayer(playerId);
+        renderGroupPlay(t);
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to eliminate player');
+      }
+    });
+
+    // Restart tournament
+    document.getElementById('restart-tournament-btn').addEventListener('click', async () => {
+      const ok = await showConfirm('Restart tournament', 'Are you sure? The tournament will restart with the same players on the setup screen.');
+      if (!ok) return;
+      clearGroupPlayError();
+      try {
+        const t = await API.restartTournament();
+        renderSetup(t);
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to restart tournament');
+      }
+    });
+
+    // End tournament
+    document.getElementById('end-tournament-btn').addEventListener('click', async () => {
+      const ok = await showConfirm('End tournament', 'Are you sure? This will end the tournament and return to the front page with no players.');
+      if (!ok) return;
+      clearGroupPlayError();
+      try {
+        await API.createTournament(3);
+        await loadAndRender();
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to end tournament');
+      }
+    });
+
+    // End-of-game panel: Restart tournament (same players, go to setup)
+    document.getElementById('end-panel-restart-btn').addEventListener('click', async () => {
+      const ok = await showConfirm('Restart tournament', 'Are you sure? The tournament will restart with the same players on the setup screen.');
+      if (!ok) return;
+      try {
+        const t = await API.getTournament();
+        if (!t) return;
+        const all = [
+          ...(t.players || []),
+          ...(t.bracket_semi_final_players || []),
+          ...(t.eliminated_players || []),
+        ];
+        const seen = new Set();
+        const names = all.filter((p) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        }).map((p) => p.name);
+        await API.createTournament(3);
+        for (const name of names) {
+          await API.addPlayer(name);
+        }
+        await loadAndRender();
+      } catch (err) {
+        showError(err.message || 'Failed to restart tournament');
+      }
+    });
+
+    // End-of-game panel: Reset (go to front page with no players)
+    document.getElementById('end-panel-reset-btn').addEventListener('click', async () => {
+      const ok = await showConfirm('Reset', 'Are you sure? This will go to the front page with no players.');
+      if (!ok) return;
+      try {
+        await API.createTournament(3);
+        await loadAndRender();
+      } catch (err) {
+        showError(err.message || 'Failed to reset');
+      }
+    });
+
+    document.getElementById('final-selection-checkboxes').addEventListener('change', () => {
+      const btn = document.getElementById('add-back-btn');
+      const needed = parseInt(btn.dataset.needed || '0', 10);
+      const checked = document.querySelectorAll('#final-selection-checkboxes .final-selection-cb:checked');
+      btn.disabled = checked.length !== needed;
+    });
+
+    document.getElementById('continue-to-semi-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      try {
+        await API.startSemiFinals();
+        await loadAndRender();
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to start semi-finals');
+      }
+    });
+
+    document.getElementById('add-back-btn').addEventListener('click', async () => {
+      clearGroupPlayError();
+      const checked = document.querySelectorAll('#final-selection-checkboxes .final-selection-cb:checked');
+      const playerIds = Array.from(checked).map((el) => el.getAttribute('data-player-id'));
+      if (playerIds.length === 0) return;
+      try {
+        await API.addBackFromLastEliminated(playerIds);
+        await loadAndRender();
+      } catch (err) {
+        showGroupPlayError(err.message || 'Failed to add players back');
+      }
+    });
+
+    document.getElementById('bracket-generate-btn').addEventListener('click', async () => {
+      clearBracketError();
+      try {
+        await API.generateFinalsMatches();
+        await loadAndRender();
+      } catch (err) {
+        showBracketError(err.message || 'Failed to generate semi-final matches');
+      }
+    });
+
+    document.getElementById('bracket-submit-btn').addEventListener('click', async () => {
+      clearBracketError();
+      try {
+        await API.submitFinals();
+        await loadAndRender();
+      } catch (err) {
+        showBracketError(err.message || 'Failed to submit results');
+      }
+    });
+
+    document.getElementById('bracket-container').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.bracket-team');
+      if (!btn || btn.disabled) return;
+      const matchId = btn.getAttribute('data-match-id');
+      const team = btn.getAttribute('data-team');
+      if (!matchId || !team) return;
+      clearBracketError();
+      try {
+        await API.setFinalsWinner(matchId, team);
+        await loadAndRender();
+      } catch (err) {
+        showBracketError(err.message || 'Failed to set winner');
+      }
+    });
+
+    loadAndRender();
+  </script>
+</body>
+</html>
