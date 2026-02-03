@@ -356,9 +356,11 @@
   <script>
     let activePlayersScrollRafId = null;
     let activePlayersScrollTimeoutId = null;
+    let activePlayersScrollCount = 8;
     let activePlayersAutoScrollStarted = false;
     let matchesScrollRafId = null;
     let matchesScrollTimeoutId = null;
+    let matchesScrollCount = 8;
 
     const TOURNAMENT_ID_KEY = 'dart_tournament_id';
 
@@ -785,7 +787,8 @@
       const submitBtn = document.getElementById('submit-results-btn');
       submitBtn.disabled = !allHaveWinner;
 
-      if (matches.length > 0) startMatchesAutoScroll();
+      if (matches.length > 0) startMatchesAutoScroll(matches.length);
+      if (players.length > 0) startActivePlayersAutoScroll(players.length);
     }
 
     function bracketNameLookup(tournament) {
@@ -1076,18 +1079,19 @@
       endBracketPlayersScrollRafId = requestAnimationFrame(step);
     }
 
-    function startActivePlayersAutoScroll() {
+    function startActivePlayersAutoScroll(playerCount) {
       if (activePlayersScrollRafId != null) cancelAnimationFrame(activePlayersScrollRafId);
       if (activePlayersScrollTimeoutId != null) clearTimeout(activePlayersScrollTimeoutId);
       activePlayersScrollRafId = null;
       activePlayersScrollTimeoutId = null;
+      if (playerCount != null && playerCount > 0) activePlayersScrollCount = playerCount;
 
       const el = document.getElementById('active-players-scroll');
       if (!el) return;
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll <= 0) return;
 
-      const scrollDurationMs = 48000;
+      const scrollDurationMs = Math.max(6000, Math.min(1200000, activePlayersScrollCount * 1500));
       let startTime = null;
 
       function step(timestamp) {
@@ -1118,15 +1122,16 @@
       matchesScrollTimeoutId = null;
     }
 
-    function startMatchesAutoScroll() {
+    function startMatchesAutoScroll(matchCount) {
       stopMatchesAutoScroll();
+      if (matchCount != null && matchCount > 0) matchesScrollCount = matchCount;
 
       const el = document.getElementById('group-play-matches-area');
       if (!el) return;
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll <= 0) return;
 
-      const scrollDurationMs = 72000;
+      const scrollDurationMs = Math.max(6000, Math.min(90000, matchesScrollCount * 3000));
       let startTime = null;
 
       function step(timestamp) {
@@ -1296,8 +1301,8 @@
       try {
         const t = await API.generateMatches();
         renderGroupPlay(t);
-        startActivePlayersAutoScroll();
-        startMatchesAutoScroll();
+        startActivePlayersAutoScroll((t.players || []).length);
+        startMatchesAutoScroll((t.matches || []).length);
         activePlayersAutoScrollStarted = true;
       } catch (err) {
         showGroupPlayError(err.message || 'Failed to generate matches');
