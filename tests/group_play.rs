@@ -2,12 +2,12 @@
 
 use dart_tournament_web::{
     generate_group_play_matches, process_group_play_results, Player, RoundType, Team,
-    Tournament, TournamentError, TournamentState,
+    Tournament, TournamentError, TournamentMode, TournamentState,
 };
 
 fn tournament_with_players(n: usize) -> Tournament {
     let players: Vec<Player> = (0..n).map(|i| Player::new(format!("P{i}"))).collect();
-    let mut t = Tournament::with_players(players, 2);
+    let mut t = Tournament::with_players(players, 2, TournamentMode::TwoVTwo);
     t.state = TournamentState::GroupPlay;
     t
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dart Tournament</title>
-  <!-- Tailwind CSS (CDN) -->
+  <!-- Tailwind CSS: CDN is for development only. For production, use the CLI: npx tailwindcss -i ./input.css -o ./static/output.css -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Font Awesome (CDN) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
@@ -34,9 +34,12 @@
             <input
               type="text"
               id="player-name-input"
+              name="player-name"
               placeholder="Player name"
               class="flex-1 min-w-[20ch] rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
               maxlength="100"
+              autocomplete="off"
+              aria-label="Player name"
             />
             <button
               type="button"
@@ -49,32 +52,46 @@
           <ul id="player-list" class="divide-y divide-slate-200 rounded-lg border border-slate-200 overflow-hidden">
             <!-- Filled by JS -->
           </ul>
-          <p class="text-slate-500 text-sm mt-2">Need at least 8 players to start.</p>
+          <p class="text-slate-500 text-sm mt-2" id="setup-players-required-msg">Need at least 8 players to start.</p>
         </div>
 
         <div class="p-6 rounded-xl bg-white shadow border border-slate-200">
           <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <i class="fas fa-heart-crack text-sky-500"></i>
-            Max losses before elimination
+            <i class="fas fa-cog text-sky-500"></i>
+            Options
           </h2>
-          <div class="flex items-center gap-2">
-            <input
-              type="number"
-              id="max-losses-input"
-              min="1"
-              max="10"
-              value="3"
-              class="w-20 rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500"
-            />
-            <button
-              type="button"
-              id="set-max-losses-btn"
-              class="px-4 py-2 rounded-lg bg-slate-600 text-white font-medium hover:bg-slate-700 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
-            >
-              Set
-            </button>
+          <div class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <label for="tournament-mode-select" class="text-sm font-medium text-slate-700 min-w-[12rem]">Mode</label>
+              <select
+                id="tournament-mode-select"
+                class="rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white"
+              >
+                <option value="1v1">1v1 (4 players to semi-finals)</option>
+                <option value="2v2" selected>2v2 (8 players to semi-finals)</option>
+              </select>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <label for="max-losses-input" class="text-sm font-medium text-slate-700 min-w-[12rem]">Max losses before elimination</label>
+              <input
+                type="number"
+                id="max-losses-input"
+                min="1"
+                max="10"
+                value="3"
+                class="w-20 rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500"
+              />
+              <button
+                type="button"
+                id="set-max-losses-btn"
+                class="px-4 py-2 rounded-lg bg-slate-600 text-white font-medium hover:bg-slate-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+              >
+                Set
+              </button>
+            </div>
           </div>
         </div>
+
 
         <div class="flex gap-4">
           <button
@@ -340,6 +357,8 @@
     let activePlayersScrollRafId = null;
     let activePlayersScrollTimeoutId = null;
     let activePlayersAutoScrollStarted = false;
+    let matchesScrollRafId = null;
+    let matchesScrollTimeoutId = null;
 
     const TOURNAMENT_ID_KEY = 'dart_tournament_id';
 
@@ -352,16 +371,30 @@
     }
 
     const API = {
-      async createTournament(maxLosses = 3) {
+      async createTournament(maxLosses = 3, mode = '2v2') {
         const res = await fetch('/api/tournaments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ max_losses: maxLosses }),
+          body: JSON.stringify({ max_losses: maxLosses, mode }),
         });
         if (!res.ok) throw new Error(await res.text());
         const t = await res.json();
         setTournamentId(t.id);
         return t;
+      },
+      async setMode(mode) {
+        const id = getTournamentId();
+        if (!id) throw new Error('No tournament');
+        const res = await fetch(`/api/tournaments/${id}/mode`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || res.statusText);
+        }
+        return res.json();
       },
       async getTournament() {
         const id = getTournamentId();
@@ -384,6 +417,10 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim() }),
         });
+        if (res.status === 404) {
+          setTournamentId(null);
+          throw new Error('Session expired. Please add your players again.');
+        }
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || res.statusText);
@@ -606,10 +643,19 @@
       document.getElementById('end-tournament-view').classList.add('hidden');
       document.getElementById('header-subtitle').textContent = 'Setup players and start the tournament.';
       document.getElementById('max-losses-input').value = tournament.max_losses;
+      const mode = tournament.mode || '2v2';
+      const modeSelect = document.getElementById('tournament-mode-select');
+      if (modeSelect) modeSelect.value = mode;
+      updateSetupPlayersRequiredMessage();
+      const required = mode === '1v1' ? 4 : 8;
+      const startBtn = document.getElementById('start-tournament-btn');
+      const playerCount = tournament.players ? tournament.players.length : 0;
+      startBtn.disabled = playerCount < required;
       renderPlayerList(tournament.players);
       document.body.classList.remove('overflow-hidden');
       document.getElementById('main-container').classList.remove('h-screen', 'max-h-screen');
       activePlayersAutoScrollStarted = false;
+      stopMatchesAutoScroll();
     }
 
     function playerNameLookup(tournament) {
@@ -627,26 +673,27 @@
       document.getElementById('end-tournament-view').classList.add('hidden');
       document.getElementById('main-container').classList.remove('max-w-4xl', 'max-w-5xl', 'max-w-6xl', 'max-w-7xl');
       document.getElementById('main-container').classList.add('max-w-[120rem]');
+      const requiredSemi = (tournament.mode === '1v1') ? 4 : 8;
       document.getElementById('header-subtitle').textContent = tournament.state === 'final_selection'
-        ? 'Select players to rejoin until 8 remain, then continue to semi-finals.'
+        ? `Select players to rejoin until ${requiredSemi} remain, then continue to semi-finals.`
         : 'Group play – generate matches and submit results.';
       document.body.classList.add('overflow-hidden');
       document.getElementById('main-container').classList.add('h-screen', 'max-h-screen');
 
       const isFinalSelection = tournament.state === 'final_selection';
       const playerCount = tournament.players ? tournament.players.length : 0;
-      const needToSelect = 8 - playerCount;
+      const needToSelect = requiredSemi - playerCount;
       const lastEliminated = tournament.last_eliminated_players || [];
 
       document.getElementById('generate-matches-btn').classList.toggle('hidden', isFinalSelection);
 
       const finalPanel = document.getElementById('final-selection-panel');
       const readyBanner = document.getElementById('final-selection-ready-banner');
-      if (isFinalSelection && playerCount < 8) {
+      if (isFinalSelection && playerCount < requiredSemi) {
         finalPanel.classList.remove('hidden');
         readyBanner.classList.add('hidden');
         document.getElementById('final-selection-message').textContent =
-          `Select ${needToSelect} player${needToSelect === 1 ? '' : 's'} from the last eliminated to rejoin (need 8 total).`;
+          `Select ${needToSelect} player${needToSelect === 1 ? '' : 's'} from the last eliminated to rejoin (need ${requiredSemi} total).`;
         const checkboxesEl = document.getElementById('final-selection-checkboxes');
         if (lastEliminated.length === 0) {
           checkboxesEl.innerHTML = '<p class="text-sm text-amber-700">No last eliminated players to select.</p>';
@@ -661,9 +708,11 @@
         const addBackBtn = document.getElementById('add-back-btn');
         addBackBtn.disabled = true;
         addBackBtn.dataset.needed = String(needToSelect);
-      } else if (isFinalSelection && playerCount === 8) {
+      } else if (isFinalSelection && playerCount === requiredSemi) {
         finalPanel.classList.add('hidden');
         readyBanner.classList.remove('hidden');
+        const readyP = document.querySelector('#final-selection-ready-banner p');
+        if (readyP) readyP.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${requiredSemi} players – ready for semi-finals.`;
       } else {
         finalPanel.classList.add('hidden');
         readyBanner.classList.add('hidden');
@@ -735,6 +784,8 @@
       const allHaveWinner = matches.length > 0 && matches.every((m) => matchResults[m.id]);
       const submitBtn = document.getElementById('submit-results-btn');
       submitBtn.disabled = !allHaveWinner;
+
+      if (matches.length > 0) startMatchesAutoScroll();
     }
 
     function bracketNameLookup(tournament) {
@@ -966,7 +1017,7 @@
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll <= 0) return;
 
-      const scrollDurationMs = 12000;
+      const scrollDurationMs = 24000;
       let startTime = null;
 
       function step(timestamp) {
@@ -1001,7 +1052,7 @@
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll <= 0) return;
 
-      const scrollDurationMs = 12000;
+      const scrollDurationMs = 24000;
       let startTime = null;
 
       function step(timestamp) {
@@ -1036,7 +1087,7 @@
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll <= 0) return;
 
-      const scrollDurationMs = 24000;
+      const scrollDurationMs = 48000;
       let startTime = null;
 
       function step(timestamp) {
@@ -1060,10 +1111,59 @@
       activePlayersScrollRafId = requestAnimationFrame(step);
     }
 
+    function stopMatchesAutoScroll() {
+      if (matchesScrollRafId != null) cancelAnimationFrame(matchesScrollRafId);
+      if (matchesScrollTimeoutId != null) clearTimeout(matchesScrollTimeoutId);
+      matchesScrollRafId = null;
+      matchesScrollTimeoutId = null;
+    }
+
+    function startMatchesAutoScroll() {
+      stopMatchesAutoScroll();
+
+      const el = document.getElementById('group-play-matches-area');
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+
+      const scrollDurationMs = 72000;
+      let startTime = null;
+
+      function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / scrollDurationMs, 1);
+        el.scrollTop = progress * maxScroll;
+
+        if (progress < 1) {
+          matchesScrollRafId = requestAnimationFrame(step);
+        } else {
+          matchesScrollRafId = null;
+          matchesScrollTimeoutId = setTimeout(() => {
+            matchesScrollTimeoutId = null;
+            el.scrollTop = 0;
+            startMatchesAutoScroll();
+          }, 8000);
+        }
+      }
+
+      matchesScrollRafId = requestAnimationFrame(step);
+    }
+
+    function getSetupMode() {
+      const sel = document.getElementById('tournament-mode-select');
+      return (sel && sel.value) || '2v2';
+    }
+    function updateSetupPlayersRequiredMessage() {
+      const required = getSetupMode() === '1v1' ? 4 : 8;
+      const el = document.getElementById('setup-players-required-msg');
+      if (el) el.textContent = `Need at least ${required} players to start.`;
+    }
     async function ensureTournament() {
       let t = await API.getTournament();
       if (!t) {
-        t = await API.createTournament(3);
+        const mode = getSetupMode();
+        t = await API.createTournament(3, mode);
       }
       return t;
     }
@@ -1095,25 +1195,59 @@
       }
     }
 
-    document.getElementById('add-player-btn').addEventListener('click', async () => {
+    function init() {
+    try {
+    loadAndRender();
+    const addPlayerBtn = document.getElementById('add-player-btn');
+    const playerNameInput = document.getElementById('player-name-input');
+    function doAddPlayer() {
       const input = document.getElementById('player-name-input');
+      if (!input) return;
       const name = input.value.trim();
       if (!name) return;
       clearError();
-      try {
-        const t = await API.addPlayer(name);
-        input.value = '';
-        renderSetup(t);
-      } catch (e) {
-        showError(e.message || 'Failed to add player');
-      }
-    });
+      (async () => {
+        try {
+          if (!getTournamentId()) await ensureTournament();
+          const t = await API.addPlayer(name);
+          input.value = '';
+          renderSetup(t);
+        } catch (e) {
+          showError(e.message || 'Failed to add player');
+        }
+      })();
+    }
+    if (addPlayerBtn) addPlayerBtn.addEventListener('click', doAddPlayer);
+    if (playerNameInput) {
+      playerNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doAddPlayer();
+        }
+      });
+    }
 
-    document.getElementById('player-name-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('add-player-btn').click();
-    });
+    const modeSelectEl = document.getElementById('tournament-mode-select');
+    if (modeSelectEl) {
+      modeSelectEl.addEventListener('change', async () => {
+        updateSetupPlayersRequiredMessage();
+        const id = getTournamentId();
+        if (!id) return;
+        clearError();
+        try {
+          const t = await API.getTournament();
+          if (!t || t.state !== 'setup') return;
+          const mode = getSetupMode();
+          const updated = await API.setMode(mode);
+          renderSetup(updated);
+        } catch (e) {
+          showError(e.message || 'Failed to update mode');
+        }
+      });
+    }
 
-    document.getElementById('player-list').addEventListener('click', async (e) => {
+    const playerListEl = document.getElementById('player-list');
+    if (playerListEl) playerListEl.addEventListener('click', async (e) => {
       const btn = e.target.closest('.remove-player');
       if (!btn) return;
       const id = btn.getAttribute('data-id');
@@ -1127,8 +1261,10 @@
       }
     });
 
-    document.getElementById('set-max-losses-btn').addEventListener('click', async () => {
+    const setMaxLossesBtn = document.getElementById('set-max-losses-btn');
+    if (setMaxLossesBtn) setMaxLossesBtn.addEventListener('click', async () => {
       const input = document.getElementById('max-losses-input');
+      if (!input) return;
       const val = parseInt(input.value, 10);
       if (isNaN(val) || val < 1 || val > 10) {
         showError('Max losses must be between 1 and 10');
@@ -1143,7 +1279,8 @@
       }
     });
 
-    document.getElementById('start-tournament-btn').addEventListener('click', async () => {
+    const startTournamentBtn = document.getElementById('start-tournament-btn');
+    if (startTournamentBtn) startTournamentBtn.addEventListener('click', async () => {
       clearError();
       try {
         const t = await API.startTournament();
@@ -1153,12 +1290,14 @@
       }
     });
 
-    document.getElementById('generate-matches-btn').addEventListener('click', async () => {
+    const generateMatchesBtn = document.getElementById('generate-matches-btn');
+    if (generateMatchesBtn) generateMatchesBtn.addEventListener('click', async () => {
       clearGroupPlayError();
       try {
         const t = await API.generateMatches();
         renderGroupPlay(t);
         startActivePlayersAutoScroll();
+        startMatchesAutoScroll();
         activePlayersAutoScrollStarted = true;
       } catch (err) {
         showGroupPlayError(err.message || 'Failed to generate matches');
@@ -1312,7 +1451,7 @@
       if (!ok) return;
       clearGroupPlayError();
       try {
-        await API.createTournament(3);
+        await API.createTournament(3, getSetupMode());
         await loadAndRender();
       } catch (err) {
         showGroupPlayError(err.message || 'Failed to end tournament');
@@ -1337,7 +1476,7 @@
           seen.add(p.id);
           return true;
         }).map((p) => p.name);
-        await API.createTournament(3);
+        await API.createTournament(3, (t.mode || '2v2'));
         for (const name of names) {
           await API.addPlayer(name);
         }
@@ -1352,7 +1491,7 @@
       const ok = await showConfirm('Reset', 'Are you sure? This will go to the front page with no players.');
       if (!ok) return;
       try {
-        await API.createTournament(3);
+        await API.createTournament(3, getSetupMode());
         await loadAndRender();
       } catch (err) {
         showError(err.message || 'Failed to reset');
@@ -1454,7 +1593,19 @@
       }
     });
 
-    loadAndRender();
+    } catch (err) {
+      console.error('Init error:', err);
+      if (typeof showError === 'function') showError('Page setup error: ' + (err && err.message));
+    }
+    }
+    function runInit() {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        setTimeout(init, 0);
+      }
+    }
+    runInit();
   </script>
 </body>
 </html>

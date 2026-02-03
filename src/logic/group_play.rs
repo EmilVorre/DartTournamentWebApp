@@ -1,23 +1,28 @@
 //! Group stage: match generation and result processing.
 
 use crate::models::{
-    GameMatch, Player, PlayerId, RoundType, Tournament, TournamentError, TournamentState,
+    GameMatch, Player, PlayerId, RoundType, Tournament, TournamentError, TournamentMode,
+    TournamentState,
 };
 use crate::Team;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-/// Generate 2v2 matches for the current group play round.
+/// Generate matches for the current group play round (1v1: 2 per match, 2v2: 4 per match).
 ///
 /// 1. Filter to non-eliminated players.
-/// 2. Sort by `internal_times_sat_out` (ascending) so those who sat out least come first.
-/// 3. Take excess = len % 4; the first `excess` (least sat out) sit out this round so sit-outs rotate fairly.
-/// 4. Shuffle the playing set and form matches: chunks of 4 → team_1 = [0,1], team_2 = [2,3].
-/// 5. Update sit-out counts for unused players and set `tournament.matches` and `tournament.unused_players`.
+/// 2. Sort by `internal_times_sat_out` (ascending).
+/// 3. Take excess = len % players_per_round; first `excess` sit out.
+/// 4. Shuffle and form matches: 1v1 chunks of 2, 2v2 chunks of 4.
 pub fn generate_group_play_matches(tournament: &mut Tournament) -> Result<(), TournamentError> {
     if tournament.state != TournamentState::GroupPlay {
         return Err(TournamentError::InvalidState);
     }
+
+    let (min_players, chunk_size, excess_mod) = match tournament.mode {
+        TournamentMode::OneVOne => (2, 2, 2),
+        TournamentMode::TwoVTwo => (4, 4, 4),
+    };
 
     let mut available: Vec<_> = tournament
         .players
@@ -26,12 +31,11 @@ pub fn generate_group_play_matches(tournament: &mut Tournament) -> Result<(), To
         .cloned()
         .collect();
 
-    if available.len() < 4 {
+    if available.len() < min_players {
         return Err(TournamentError::NotEnoughPlayers);
     }
 
     let mut rng = rand::thread_rng();
-    // Assign a stable random tie-break per player, then sort (ascending sit-out, then tie-break)
     let mut with_tiebreak: Vec<(Player, u32)> = available
         .drain(..)
         .map(|p| (p, rng.gen::<u32>()))
@@ -40,27 +44,31 @@ pub fn generate_group_play_matches(tournament: &mut Tournament) -> Result<(), To
     available = with_tiebreak.into_iter().map(|(p, _)| p).collect();
 
     let n = available.len();
-    let excess = n % 4;
+    let excess = n % excess_mod;
 
-    // Unused: first `excess` (least sat out) sit out this round so sit-outs rotate fairly
     let mut unused: Vec<Player> = available.drain(0..excess).collect();
     for p in &mut unused {
         p.record_sat_out();
     }
 
-    // Playing: remaining; shuffle for random match formation
     available.shuffle(&mut rng);
 
     let matches: Vec<GameMatch> = available
-        .chunks_exact(4)
+        .chunks_exact(chunk_size)
         .map(|chunk| {
-            let team_1 = vec![chunk[0].id, chunk[1].id];
-            let team_2 = vec![chunk[2].id, chunk[3].id];
+            let (team_1, team_2) = match tournament.mode {
+                TournamentMode::OneVOne => (vec![chunk[0].id], vec![chunk[1].id]),
+                TournamentMode::TwoVTwo => {
+                    (
+                        vec![chunk[0].id, chunk[1].id],
+                        vec![chunk[2].id, chunk[3].id],
+                    )
+                }
+            };
             GameMatch::new(team_1, team_2, RoundType::GroupPlay)
         })
         .collect();
 
-    // Update tournament.players: put back the updated unused (with record_sat_out) and playing
     for p in &unused {
         if let Some(t) = tournament.players.iter_mut().find(|t| t.id == p.id) {
             t.times_sat_out = p.times_sat_out;
@@ -119,7 +127,8 @@ pub fn process_group_play_results(tournament: &mut Tournament) -> Result<(), Tou
     tournament.unused_players.clear();
     tournament.match_results.clear();
 
-    if tournament.players.len() <= 8 {
+    let threshold = tournament.players_required_for_semi();
+    if tournament.players.len() <= threshold {
         tournament.state = TournamentState::FinalSelection;
     }
 

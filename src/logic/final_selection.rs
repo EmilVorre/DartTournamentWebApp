@@ -1,10 +1,10 @@
-//! Final selection: add players back from last eliminated to reach 8 for semi-finals.
+//! Final selection: add players back from last eliminated to reach 4 (1v1) or 8 (2v2) for semi-finals.
 
 use crate::models::{PlayerId, Tournament, TournamentError, TournamentState};
 
 /// Add selected players from last_eliminated_players back to the tournament.
-/// Must select exactly (8 - players.len()) players, all from last_eliminated_players.
-/// If we reach 8 players, state becomes SemiFinals.
+/// Must select exactly (required - players.len()) players, all from last_eliminated_players.
+/// When we reach required (4 or 8), state becomes SemiFinals.
 pub fn add_players_back_from_last_eliminated(
     tournament: &mut Tournament,
     player_ids: &[PlayerId],
@@ -12,11 +12,12 @@ pub fn add_players_back_from_last_eliminated(
     if tournament.state != TournamentState::FinalSelection {
         return Err(TournamentError::InvalidState);
     }
+    let required = tournament.players_required_for_semi();
     let current = tournament.players.len();
-    if current >= 8 {
+    if current >= required {
         return Err(TournamentError::InvalidState);
     }
-    let needed = 8 - current;
+    let needed = required - current;
     if player_ids.len() != needed {
         return Err(TournamentError::WrongNumberOfPlayers {
             needed,
@@ -50,19 +51,20 @@ pub fn add_players_back_from_last_eliminated(
         .eliminated_players
         .retain(|p| !ids_to_add.contains(&p.id));
 
-    if tournament.players.len() == 8 {
+    if tournament.players.len() == required {
         tournament.state = TournamentState::SemiFinals;
     }
 
     Ok(())
 }
 
-/// Transition from FinalSelection to SemiFinals when exactly 8 players (no add-back needed).
+/// Transition from FinalSelection to SemiFinals when exactly 4 (1v1) or 8 (2v2) players (no add-back needed).
 pub fn start_semi_finals(tournament: &mut Tournament) -> Result<(), TournamentError> {
     if tournament.state != TournamentState::FinalSelection {
         return Err(TournamentError::InvalidState);
     }
-    if tournament.players.len() != 8 {
+    let required = tournament.players_required_for_semi();
+    if tournament.players.len() != required {
         return Err(TournamentError::InvalidState);
     }
     tournament.state = TournamentState::SemiFinals;

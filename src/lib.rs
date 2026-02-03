@@ -10,5 +10,5 @@ pub use logic::{
 };
 pub use models::{
     GameMatch, MatchId, Player, PlayerId, PlayerStats, RoundType, Team, Tournament, TournamentError,
-    TournamentId, TournamentState,
+    TournamentId, TournamentMode, TournamentState,
 };

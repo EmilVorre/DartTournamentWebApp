@@ -1,16 +1,18 @@
 //! Final rounds: semi-finals and finals (single-elimination bracket). Tournament ends after finals with two winners.
 
 use crate::models::{
-    GameMatch, MatchId, PlayerId, RoundType, Team, Tournament, TournamentError, TournamentState,
+    GameMatch, MatchId, PlayerId, RoundType, Team, Tournament, TournamentError, TournamentMode,
+    TournamentState,
 };
 use rand::seq::SliceRandom;
 
-/// Generate semi-final matches (8 players → 2 matches of 2v2). Seeds randomly.
+/// Generate semi-final matches: 4 players (1v1) → 2 matches of 1v1; 8 players (2v2) → 2 matches of 2v2. Seeds randomly.
 pub fn generate_semi_final_matches(tournament: &mut Tournament) -> Result<(), TournamentError> {
     if tournament.state != TournamentState::SemiFinals {
         return Err(TournamentError::InvalidState);
     }
-    if tournament.players.len() != 8 {
+    let required = tournament.players_required_for_semi();
+    if tournament.players.len() != required {
         return Err(TournamentError::InvalidState);
     }
     let mut players = std::mem::take(&mut tournament.players);
@@ -18,18 +20,24 @@ pub fn generate_semi_final_matches(tournament: &mut Tournament) -> Result<(), To
     tournament.players = players;
 
     let p = &tournament.players;
-    let matches = vec![
-        GameMatch::new(
-            vec![p[0].id, p[1].id],
-            vec![p[2].id, p[3].id],
-            RoundType::SemiFinals,
-        ),
-        GameMatch::new(
-            vec![p[4].id, p[5].id],
-            vec![p[6].id, p[7].id],
-            RoundType::SemiFinals,
-        ),
-    ];
+    let matches: Vec<GameMatch> = match tournament.mode {
+        TournamentMode::OneVOne => vec![
+            GameMatch::new(vec![p[0].id], vec![p[1].id], RoundType::SemiFinals),
+            GameMatch::new(vec![p[2].id], vec![p[3].id], RoundType::SemiFinals),
+        ],
+        TournamentMode::TwoVTwo => vec![
+            GameMatch::new(
+                vec![p[0].id, p[1].id],
+                vec![p[2].id, p[3].id],
+                RoundType::SemiFinals,
+            ),
+            GameMatch::new(
+                vec![p[4].id, p[5].id],
+                vec![p[6].id, p[7].id],
+                RoundType::SemiFinals,
+            ),
+        ],
+    };
     tournament.matches = matches;
     tournament.final_match_results.clear();
     Ok(())
@@ -125,11 +133,15 @@ pub fn process_semi_final_results(tournament: &mut Tournament) -> Result<(), Tou
     tournament.players = advancing;
 
     let p = &tournament.players;
-    tournament.matches = vec![GameMatch::new(
-        vec![p[0].id, p[1].id],
-        vec![p[2].id, p[3].id],
-        RoundType::Finals,
-    )];
+    let finals_match = match tournament.mode {
+        TournamentMode::OneVOne => GameMatch::new(vec![p[0].id], vec![p[1].id], RoundType::Finals),
+        TournamentMode::TwoVTwo => GameMatch::new(
+            vec![p[0].id, p[1].id],
+            vec![p[2].id, p[3].id],
+            RoundType::Finals,
+        ),
+    };
+    tournament.matches = vec![finals_match];
     tournament.state = TournamentState::Finals;
     Ok(())
 }

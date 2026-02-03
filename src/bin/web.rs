@@ -43,6 +43,8 @@ struct HealthResponse {
 struct CreateTournamentBody {
     #[serde(default = "default_max_losses")]
     max_losses: u32,
+    #[serde(default)]
+    mode: dart_tournament_web::TournamentMode,
 }
 
 fn default_max_losses() -> u32 {
@@ -75,6 +77,11 @@ struct SetPlayerLossesBody {
     losses: u32,
 }
 
+#[derive(Deserialize)]
+struct SetModeBody {
+    mode: dart_tournament_web::TournamentMode,
+}
+
 /// Path segment: tournament id (e.g. /api/tournaments/{id})
 #[derive(Deserialize)]
 struct TournamentPath {
@@ -96,6 +103,12 @@ async fn api_health() -> impl Responder {
     })
 }
 
+/// Avoid 404 in browser tab: favicon not required for app logic.
+#[get("/favicon.ico")]
+async fn favicon() -> HttpResponse {
+    HttpResponse::NoContent().finish()
+}
+
 /// Create a new tournament (returns it with id; client stores id for subsequent requests).
 #[post("/api/tournaments")]
 async fn api_create_tournament(state: AppState, body: Option<Json<CreateTournamentBody>>) -> HttpResponse {
@@ -103,7 +116,11 @@ async fn api_create_tournament(state: AppState, body: Option<Json<CreateTourname
         .as_ref()
         .map(|b| b.max_losses)
         .unwrap_or_else(default_max_losses);
-    let tournament = Tournament::new(max_losses);
+    let mode = body
+        .as_ref()
+        .map(|b| b.mode)
+        .unwrap_or(dart_tournament_web::TournamentMode::TwoVTwo);
+    let tournament = Tournament::new(max_losses, mode);
     let id = tournament.id;
     let mut g = match state.write() {
         Ok(guard) => guard,
@@ -311,6 +328,29 @@ async fn api_eliminate_player(state: AppState, path: Path<TournamentPlayerPath>)
     }
 }
 
+/// Set tournament mode 1v1 or 2v2 (Setup only).
+#[put("/api/tournaments/{id}/mode")]
+async fn api_set_mode(
+    state: AppState,
+    path: Path<TournamentPath>,
+    body: Json<SetModeBody>,
+) -> HttpResponse {
+    let mut g = match state.write() {
+        Ok(guard) => guard,
+        Err(_) => return HttpResponse::InternalServerError().body("lock error"),
+    };
+    let entry = match g.get_mut(&path.id) {
+        Some(e) => e,
+        None => return HttpResponse::NotFound().json(serde_json::json!({ "error": "No tournament" })),
+    };
+    entry.last_activity = Instant::now();
+    let t = &mut entry.tournament;
+    match t.set_mode(body.mode) {
+        Ok(()) => HttpResponse::Ok().json(t),
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({ "error": e.to_string() })),
+    }
+}
+
 /// Restart tournament: back to Setup with same player names.
 #[post("/api/tournaments/{id}/restart")]
 async fn api_restart_tournament(state: AppState, path: Path<TournamentPath>) -> HttpResponse {
@@ -484,11 +524,13 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .route("/", web::get().to(serve_index_async))
             .service(api_health)
+            .service(favicon)
             .service(api_create_tournament)
             .service(api_get_tournament)
             .service(api_add_player)
             .service(api_remove_player)
             .service(api_set_max_losses)
+            .service(api_set_mode)
             .service(api_start_tournament)
             .service(api_generate_matches)
             .service(api_set_match_winner)

@@ -13,15 +13,17 @@ pub enum TournamentError {
     IncompleteResults,
     /// Not enough players to generate matches (need at least 4).
     NotEnoughPlayers,
-    /// Not enough players to start (need at least 4).
-    NotEnoughPlayersToStart,
+    /// Not enough players to start (need 4 for 1v1, 8 for 2v2).
+    NotEnoughPlayersToStart { required: usize },
     /// Tournament is not in a state that allows this action.
     InvalidState,
     /// Player not found in active or unused list.
     PlayerNotFound(PlayerId),
+    /// Player name is empty or only whitespace.
+    EmptyPlayerName,
     /// A player with this name already exists (names are unique, case-insensitive).
     DuplicatePlayerName,
-    /// Wrong number of players selected for final selection (must select exactly N to reach 8).
+    /// Wrong number of players selected for final selection (must select exactly N to reach semi size).
     WrongNumberOfPlayers { needed: usize, selected: usize },
     /// A selected player is not in the last eliminated list.
     PlayerNotInLastEliminated(PlayerId),
@@ -31,10 +33,13 @@ impl std::fmt::Display for TournamentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TournamentError::IncompleteResults => write!(f, "Not all matches have a result"),
-            TournamentError::NotEnoughPlayers => write!(f, "Need at least 4 players to generate matches"),
-            TournamentError::NotEnoughPlayersToStart => write!(f, "Need at least 8 players to start"),
+            TournamentError::NotEnoughPlayers => write!(f, "Not enough players to generate matches"),
+            TournamentError::NotEnoughPlayersToStart { required } => {
+                write!(f, "Need at least {} players to start", required)
+            }
             TournamentError::InvalidState => write!(f, "Invalid state for this action"),
             TournamentError::PlayerNotFound(_) => write!(f, "Player not found"),
+            TournamentError::EmptyPlayerName => write!(f, "Player name cannot be empty"),
             TournamentError::DuplicatePlayerName => write!(f, "A player with this name already exists"),
             TournamentError::WrongNumberOfPlayers { needed, selected } => {
                 write!(f, "Must select exactly {} players to rejoin (selected {})", needed, selected)
@@ -48,6 +53,17 @@ impl std::fmt::Display for TournamentError {
 
 /// Unique identifier for a tournament.
 pub type TournamentId = Uuid;
+
+/// Tournament mode: 1v1 (4 players to semi) or 2v2 (8 players to semi).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TournamentMode {
+    #[serde(rename = "1v1")]
+    OneVOne,
+    #[default]
+    #[serde(rename = "2v2")]
+    TwoVTwo,
+}
 
 /// Current phase of the tournament.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -84,6 +100,8 @@ pub struct Tournament {
     pub unused_players: Vec<Player>,
     /// Losses before a player is eliminated.
     pub max_losses: u32,
+    /// 1v1 or 2v2; determines players needed to start (4 vs 8) and group/playoff format.
+    pub mode: TournamentMode,
     pub state: TournamentState,
     /// Current round: which team won each match (before submit).
     pub match_results: HashMap<MatchId, Team>,
@@ -103,7 +121,7 @@ pub struct Tournament {
 
 impl Tournament {
     /// Create a new tournament in Setup state with no players.
-    pub fn new(max_losses: u32) -> Self {
+    pub fn new(max_losses: u32, mode: TournamentMode) -> Self {
         Self {
             id: Uuid::new_v4(),
             players: Vec::new(),
@@ -112,6 +130,7 @@ impl Tournament {
             matches: Vec::new(),
             unused_players: Vec::new(),
             max_losses,
+            mode,
             state: TournamentState::Setup,
             match_results: HashMap::new(),
             final_match_results: HashMap::new(),
@@ -123,11 +142,27 @@ impl Tournament {
         }
     }
 
+    /// Players required to start (4 for 1v1, 8 for 2v2).
+    pub fn players_required_to_start(&self) -> usize {
+        match self.mode {
+            TournamentMode::OneVOne => 4,
+            TournamentMode::TwoVTwo => 8,
+        }
+    }
+
+    /// Players required for semi-finals (4 for 1v1, 8 for 2v2).
+    pub fn players_required_for_semi(&self) -> usize {
+        match self.mode {
+            TournamentMode::OneVOne => 4,
+            TournamentMode::TwoVTwo => 8,
+        }
+    }
+
     /// Create a tournament with initial players (e.g. from setup). Still in Setup until started.
-    pub fn with_players(players: Vec<Player>, max_losses: u32) -> Self {
+    pub fn with_players(players: Vec<Player>, max_losses: u32, mode: TournamentMode) -> Self {
         Self {
             players,
-            ..Self::new(max_losses)
+            ..Self::new(max_losses, mode)
         }
     }
 
@@ -152,7 +187,7 @@ impl Tournament {
         let name = name.into();
         let name_trimmed = name.trim();
         if name_trimmed.is_empty() {
-            return Err(TournamentError::InvalidState);
+            return Err(TournamentError::EmptyPlayerName);
         }
         let is_duplicate = self
             .players
@@ -185,6 +220,15 @@ impl Tournament {
             return Err(TournamentError::InvalidState);
         }
         self.max_losses = max_losses;
+        Ok(())
+    }
+
+    /// Set mode 1v1 or 2v2 (only valid in Setup).
+    pub fn set_mode(&mut self, mode: TournamentMode) -> Result<(), TournamentError> {
+        if self.state != TournamentState::Setup {
+            return Err(TournamentError::InvalidState);
+        }
+        self.mode = mode;
         Ok(())
     }
 
@@ -226,7 +270,8 @@ impl Tournament {
         self.players.retain(|x| x.id != player_id);
         self.unused_players.retain(|x| x.id != player_id);
         self.eliminated_players.push(p);
-        if self.players.len() + self.unused_players.len() <= 8 {
+        let threshold = self.players_required_for_semi();
+        if self.players.len() + self.unused_players.len() <= threshold {
             self.state = TournamentState::FinalSelection;
         }
         Ok(())
@@ -245,7 +290,8 @@ impl Tournament {
             .map(|p| p.name.clone())
             .collect();
         let max_losses = self.max_losses;
-        *self = Self::new(max_losses);
+        let mode = self.mode;
+        *self = Self::new(max_losses, mode);
         for name in names {
             let _ = self.add_player(name);
         }

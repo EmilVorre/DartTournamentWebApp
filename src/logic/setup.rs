@@ -2,15 +2,16 @@
 
 use crate::models::{Tournament, TournamentError, TournamentState};
 
-/// Start the tournament: require at least 8 players, set state to GroupPlay if >8 else FinalSelection.
+/// Start the tournament: require 4 players (1v1) or 8 (2v2); set state to GroupPlay if above threshold else FinalSelection.
 pub fn start_tournament(tournament: &mut Tournament) -> Result<(), TournamentError> {
     if tournament.state != TournamentState::Setup {
         return Err(TournamentError::InvalidState);
     }
-    if tournament.players.len() < 8 {
-        return Err(TournamentError::NotEnoughPlayersToStart);
+    let required = tournament.players_required_to_start();
+    if tournament.players.len() < required {
+        return Err(TournamentError::NotEnoughPlayersToStart { required });
     }
-    tournament.state = if tournament.players.len() > 8 {
+    tournament.state = if tournament.players.len() > required {
         TournamentState::GroupPlay
     } else {
         TournamentState::FinalSelection
