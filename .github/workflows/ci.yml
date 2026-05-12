@@ -36,7 +36,6 @@ jobs:
       dockerfile-path: "./Dockerfile"
       image-name: dart-tournament-web
 
-  # Matches package/rust GHCR name (lowercase owner; image-name overrides repo name)
   vars:
     runs-on: ubuntu-latest
     outputs:
