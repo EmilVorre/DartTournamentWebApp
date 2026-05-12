@@ -8,24 +8,24 @@ on:
 
 jobs:
   lint:
-    uses: EmilVorre/reuseable-workflows/.github/workflows/lint/rust.yml@v1
+    uses: EmilVorre/reuseable-workflows/.github/workflows/rust-lint.yml@v1
     with:
       rust-toolchain: stable
 
   build:
-    uses: EmilVorre/reuseable-workflows/.github/workflows/build/rust.yml@v1
+    uses: EmilVorre/reuseable-workflows/.github/workflows/rust-build.yml@v1
     needs: lint
     with:
       rust-toolchain: stable
 
   test:
-    uses: EmilVorre/reuseable-workflows/.github/workflows/test/rust.yml@v1
+    uses: EmilVorre/reuseable-workflows/.github/workflows/rust-test.yml@v1
     needs: build
     with:
       rust-toolchain: stable
 
   package:
-    uses: EmilVorre/reuseable-workflows/.github/workflows/package/rust.yml@v1
+    uses: EmilVorre/reuseable-workflows/.github/workflows/rust-package.yml@v1
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -48,7 +48,7 @@ jobs:
           echo "image=ghcr.io/${OWNER}/dart-tournament-web:latest" >> $GITHUB_OUTPUT
 
   deploy:
-    uses: EmilVorre/reuseable-workflows/.github/workflows/deploy/k8s.yml@v1
+    uses: EmilVorre/reuseable-workflows/.github/workflows/k8s-deploy.yml@v1
     needs: [package, vars]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     with:
