@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    uses: EmilVorre/reuseable-workflows/.github/workflows/lint/rust.yml@v1
+    with:
+      rust-toolchain: stable
+
+  build:
+    uses: EmilVorre/reuseable-workflows/.github/workflows/build/rust.yml@v1
+    needs: lint
+    with:
+      rust-toolchain: stable
+
+  test:
+    uses: EmilVorre/reuseable-workflows/.github/workflows/test/rust.yml@v1
+    needs: build
+    with:
+      rust-toolchain: stable
+
+  package:
+    uses: EmilVorre/reuseable-workflows/.github/workflows/package/rust.yml@v1
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    with:
+      rust-toolchain: stable
+      dockerfile-path: "./Dockerfile"
+      image-name: dart-tournament-web
+
+  # Matches package/rust GHCR name (lowercase owner; image-name overrides repo name)
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.img.outputs.image }}
+    steps:
+      - id: img
+        run: |
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${OWNER}/dart-tournament-web:latest" >> $GITHUB_OUTPUT
+
+  deploy:
+    uses: EmilVorre/reuseable-workflows/.github/workflows/deploy/k8s.yml@v1
+    needs: [package, vars]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    with:
+      image: ${{ needs.vars.outputs.image }}
+      deployment: dart
+      container: dart
+      namespace: dart
+    secrets:
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}

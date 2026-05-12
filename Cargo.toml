@@ -27,6 +27,7 @@ csv = "1"
 # Utilities (for tournament logic)
 uuid = { version = "1", features = ["v4", "serde"] }
 rand = "0.8"
+bcrypt = "0.15"
 
 # Logging
 log = "0.4"

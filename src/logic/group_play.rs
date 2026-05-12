@@ -36,10 +36,8 @@ pub fn generate_group_play_matches(tournament: &mut Tournament) -> Result<(), To
     }
 
     let mut rng = rand::thread_rng();
-    let mut with_tiebreak: Vec<(Player, u32)> = available
-        .drain(..)
-        .map(|p| (p, rng.gen::<u32>()))
-        .collect();
+    let mut with_tiebreak: Vec<(Player, u32)> =
+        available.drain(..).map(|p| (p, rng.gen::<u32>())).collect();
     with_tiebreak.sort_by_key(|(p, t)| (p.internal_times_sat_out, *t));
     available = with_tiebreak.into_iter().map(|(p, _)| p).collect();
 
@@ -58,12 +56,10 @@ pub fn generate_group_play_matches(tournament: &mut Tournament) -> Result<(), To
         .map(|chunk| {
             let (team_1, team_2) = match tournament.mode {
                 TournamentMode::OneVOne => (vec![chunk[0].id], vec![chunk[1].id]),
-                TournamentMode::TwoVTwo => {
-                    (
-                        vec![chunk[0].id, chunk[1].id],
-                        vec![chunk[2].id, chunk[3].id],
-                    )
-                }
+                TournamentMode::TwoVTwo => (
+                    vec![chunk[0].id, chunk[1].id],
+                    vec![chunk[2].id, chunk[3].id],
+                ),
             };
             GameMatch::new(team_1, team_2, RoundType::GroupPlay)
         })

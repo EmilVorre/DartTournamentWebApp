@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dart
+  namespace: dart
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dart
+  template:
+    metadata:
+      labels:
+        app: dart
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: dart
+          image: ghcr.io/emilvorre/dart-tournament-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "8080"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

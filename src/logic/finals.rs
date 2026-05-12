@@ -101,7 +101,13 @@ pub fn process_semi_final_results(tournament: &mut Tournament) -> Result<(), Tou
     let match_data: Vec<_> = tournament
         .matches
         .iter()
-        .map(|m| (m.team_1.clone(), m.team_2.clone(), tournament.final_match_results[&m.id]))
+        .map(|m| {
+            (
+                m.team_1.clone(),
+                m.team_2.clone(),
+                tournament.final_match_results[&m.id],
+            )
+        })
         .collect();
     for (team_1, team_2, w) in match_data {
         apply_playoff_match_result(tournament, &team_1, &team_2, w)?;

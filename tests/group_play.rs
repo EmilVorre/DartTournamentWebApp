@@ -1,8 +1,8 @@
 //! Integration tests for group play: match generation and result processing.
 
 use dart_tournament_web::{
-    generate_group_play_matches, process_group_play_results, Player, RoundType, Team,
-    Tournament, TournamentError, TournamentMode, TournamentState,
+    generate_group_play_matches, process_group_play_results, Player, RoundType, Team, Tournament,
+    TournamentError, TournamentMode, TournamentState,
 };
 
 fn tournament_with_players(n: usize) -> Tournament {

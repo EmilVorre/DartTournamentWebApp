@@ -33,16 +33,24 @@ impl std::fmt::Display for TournamentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TournamentError::IncompleteResults => write!(f, "Not all matches have a result"),
-            TournamentError::NotEnoughPlayers => write!(f, "Not enough players to generate matches"),
+            TournamentError::NotEnoughPlayers => {
+                write!(f, "Not enough players to generate matches")
+            }
             TournamentError::NotEnoughPlayersToStart { required } => {
                 write!(f, "Need at least {} players to start", required)
             }
             TournamentError::InvalidState => write!(f, "Invalid state for this action"),
             TournamentError::PlayerNotFound(_) => write!(f, "Player not found"),
             TournamentError::EmptyPlayerName => write!(f, "Player name cannot be empty"),
-            TournamentError::DuplicatePlayerName => write!(f, "A player with this name already exists"),
+            TournamentError::DuplicatePlayerName => {
+                write!(f, "A player with this name already exists")
+            }
             TournamentError::WrongNumberOfPlayers { needed, selected } => {
-                write!(f, "Must select exactly {} players to rejoin (selected {})", needed, selected)
+                write!(
+                    f,
+                    "Must select exactly {} players to rejoin (selected {})",
+                    needed, selected
+                )
             }
             TournamentError::PlayerNotInLastEliminated(_) => {
                 write!(f, "Selected player is not in the last eliminated list")
@@ -173,9 +181,10 @@ impl Tournament {
 
     /// Look up a player in either `players` or `unused_players` (for group play).
     pub fn get_player_mut_any(&mut self, id: PlayerId) -> Option<&mut Player> {
-        self.players.iter_mut().find(|p| p.id == id).or_else(|| {
-            self.unused_players.iter_mut().find(|p| p.id == id)
-        })
+        self.players
+            .iter_mut()
+            .find(|p| p.id == id)
+            .or_else(|| self.unused_players.iter_mut().find(|p| p.id == id))
     }
 
     /// Add a player (valid in Setup, GroupPlay, or FinalSelection). Names must be unique (case-insensitive).
@@ -234,8 +243,13 @@ impl Tournament {
 
     /// Set a player's loss count manually (GroupPlay or FinalSelection). Player must be active (in players or unused_players).
     /// When no matches have been generated yet, we do not set eliminated=true so that "Generate matches" still has enough players.
-    pub fn set_player_losses(&mut self, player_id: PlayerId, losses: u32) -> Result<(), TournamentError> {
-        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection {
+    pub fn set_player_losses(
+        &mut self,
+        player_id: PlayerId,
+        losses: u32,
+    ) -> Result<(), TournamentError> {
+        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection
+        {
             return Err(TournamentError::InvalidState);
         }
         let max_losses = self.max_losses;
@@ -255,7 +269,8 @@ impl Tournament {
     /// Manually eliminate a player (GroupPlay or FinalSelection). Moves them from active to eliminated_players.
     /// If 8 or fewer active players remain after elimination, transitions to FinalSelection (ready for semi-finals).
     pub fn eliminate_player(&mut self, player_id: PlayerId) -> Result<(), TournamentError> {
-        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection {
+        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection
+        {
             return Err(TournamentError::InvalidState);
         }
         let player = self
@@ -279,7 +294,8 @@ impl Tournament {
 
     /// Restart tournament: go back to Setup with same player names (active + eliminated). Clears matches and state.
     pub fn restart_tournament(&mut self) -> Result<(), TournamentError> {
-        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection {
+        if self.state != TournamentState::GroupPlay && self.state != TournamentState::FinalSelection
+        {
             return Err(TournamentError::InvalidState);
         }
         let names: Vec<String> = self
