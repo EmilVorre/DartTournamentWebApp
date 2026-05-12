@@ -55,6 +55,5 @@ jobs:
       deployment: dart
       container: dart
       namespace: dart
-      insecure-skip-tls-verify: true
     secrets:
       KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
