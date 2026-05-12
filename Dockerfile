@@ -1,4 +1,5 @@
-FROM rust:1.82-slim-bookworm AS builder
+# Latest stable Rust (Bookworm slim). Pin (e.g. 1.94-slim-bookworm) for reproducible builds.
+FROM rust:slim-bookworm AS builder
 
 WORKDIR /app
 
