@@ -10,6 +10,16 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
+  <!-- TEMP site-gate-temp: remove overlay + site-gate-temp.js + gate code in web.rs (SITE_GATE_PLAIN) -->
+  <div id="site-gate-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" aria-modal="true" role="dialog">
+    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+      <h2 class="text-lg font-semibold text-slate-800 mb-2 text-center">Site password</h2>
+      <p class="text-sm text-slate-600 mb-4 text-center">Enter the password to use the app.</p>
+      <input type="password" id="site-gate-password" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500" autocomplete="current-password" placeholder="Password" />
+      <p id="site-gate-error" class="hidden text-sm text-red-600 mb-2 text-center"></p>
+      <button type="button" id="site-gate-submit" class="w-full py-2.5 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">Continue</button>
+    </div>
+  </div>
   <div class="container mx-auto px-4 py-4 max-w-4xl flex flex-col flex-1 min-h-0" id="main-container">
     <header class="flex-shrink-0 mb-4">
       <h1 class="text-3xl font-bold text-slate-800 flex items-center gap-2">
@@ -17,10 +27,6 @@
         Dart Tournament
       </h1>
       <p class="text-slate-600 mt-1" id="header-subtitle">Setup players and start the tournament.</p>
-      <div id="unlock-edit-banner" class="hidden mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm flex flex-wrap items-center justify-between gap-3">
-        <span><i class="fas fa-lock mr-2"></i>View-only in this browser — enter the organizer code to make changes.</span>
-        <button type="button" id="open-unlock-modal-btn" class="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-sm font-medium hover:bg-amber-800 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">Unlock editing</button>
-      </div>
     </header>
 
     <main class="flex-1 flex flex-col min-h-0" id="main-content">
@@ -28,7 +34,6 @@
       <section id="setup-view" class="space-y-6">
         <!-- Ensure tournament exists / create one -->
         <div id="setup-error" class="hidden p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
-        <div id="organizer-code-reveal" class="hidden p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm" role="status"></div>
 
         <div class="p-6 rounded-xl bg-white shadow border border-slate-200">
           <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -94,18 +99,6 @@
                 Set
               </button>
             </div>
-            <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
-              <label for="tournament-edit-code-input" class="text-sm font-medium text-slate-700 sm:min-w-[12rem]">Organizer code</label>
-              <input
-                type="text"
-                id="tournament-edit-code-input"
-                maxlength="72"
-                placeholder="Optional — min 4 characters, or empty for random"
-                autocomplete="off"
-                class="flex-1 min-w-[16ch] rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-              />
-            </div>
-            <p class="text-xs text-slate-500 pl-0 sm:pl-[12rem] sm:-mt-2">Anyone with this code can change the tournament. Use the same field when creating a new tournament after &quot;End&quot; or &quot;Reset&quot;.</p>
           </div>
         </div>
 
@@ -367,19 +360,6 @@
           </div>
         </div>
       </div>
-      <div id="unlock-organizer-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-hidden="true">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-          <h3 class="text-lg font-semibold text-slate-800 mb-2">Unlock editing</h3>
-          <p class="text-sm text-slate-600 mb-4">Enter the organizer code for this tournament. It is not sent until you submit.</p>
-          <label class="block text-sm font-medium text-slate-700 mb-1" for="unlock-organizer-input">Organizer code</label>
-          <input type="password" id="unlock-organizer-input" class="w-full rounded-lg border border-slate-300 px-3 py-2 mb-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500" autocomplete="current-password" />
-          <p id="unlock-organizer-error" class="hidden text-sm text-red-600 mb-3"></p>
-          <div class="flex gap-3 justify-end">
-            <button type="button" id="unlock-organizer-cancel" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="button" id="unlock-organizer-confirm" class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Unlock</button>
-          </div>
-        </div>
-      </div>
     </main>
   </div>
 
@@ -393,44 +373,13 @@
     let matchesScrollCount = 8;
 
     const TOURNAMENT_ID_KEY = 'dart_tournament_id';
-    const EDIT_CODE_KEY = 'dart_tournament_edit_code';
 
     function getTournamentId() {
       return localStorage.getItem(TOURNAMENT_ID_KEY);
     }
     function setTournamentId(id) {
       if (id) localStorage.setItem(TOURNAMENT_ID_KEY, id);
-      else {
-        localStorage.removeItem(TOURNAMENT_ID_KEY);
-        localStorage.removeItem(EDIT_CODE_KEY);
-      }
-    }
-    function getEditCode() {
-      return localStorage.getItem(EDIT_CODE_KEY);
-    }
-    function setEditCode(code) {
-      if (code) localStorage.setItem(EDIT_CODE_KEY, code);
-      else localStorage.removeItem(EDIT_CODE_KEY);
-    }
-    /** @param {boolean} json - add Content-Type: application/json */
-    function mutationHeaders(json) {
-      const h = {};
-      if (json) h['Content-Type'] = 'application/json';
-      const c = getEditCode();
-      if (c) h['X-Edit-Code'] = c;
-      return h;
-    }
-    function showOrganizerCodeReveal(code) {
-      const el = document.getElementById('organizer-code-reveal');
-      if (!el || !code) return;
-      el.textContent = 'Your organizer code: ' + code + ' — save it; you need it to edit from another device or after clearing site data.';
-      el.classList.remove('hidden');
-    }
-    function updateUnlockBanner() {
-      const b = document.getElementById('unlock-edit-banner');
-      if (!b) return;
-      if (getTournamentId() && !getEditCode()) b.classList.remove('hidden');
-      else b.classList.add('hidden');
+      else localStorage.removeItem(TOURNAMENT_ID_KEY);
     }
 
     const API = {
@@ -700,8 +649,6 @@
     }
 
     function renderSetup(tournament) {
-      const rev = document.getElementById('organizer-code-reveal');
-      if (rev) rev.classList.add('hidden');
       document.getElementById('setup-view').classList.remove('hidden');
       document.getElementById('group-play-view').classList.add('hidden');
       document.getElementById('bracket-view').classList.add('hidden');
@@ -1258,7 +1205,6 @@
           document.getElementById('end-tournament-view').classList.add('hidden');
           document.getElementById('main-container').classList.add('max-w-6xl');
         }
-        updateUnlockBanner();
       } catch (e) {
         showError(e.message || 'Failed to load tournament');
       }
