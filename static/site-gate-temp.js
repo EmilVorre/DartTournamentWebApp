@@ -6,6 +6,19 @@
  * - remove SiteGate + middleware + SITE_GATE_PLAIN from web.rs
  */
 (function () {
+  var STORAGE_KEY = 'dart_site_gate_token';
+  var HEADER = 'X-Dart-Site-Gate';
+
+  var origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    var headers =
+      init.headers != null ? new Headers(init.headers) : new Headers();
+    var t = sessionStorage.getItem(STORAGE_KEY);
+    if (t) headers.set(HEADER, t);
+    return origFetch(input, Object.assign({}, init, { headers: headers }));
+  };
+
   function overlay() {
     return document.getElementById('site-gate-overlay');
   }
@@ -44,14 +57,25 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: input.value }),
     });
-    if (r.status === 204) {
-      window.location.reload();
+    if (r.status === 200) {
+      var data = await r.json().catch(function () {
+        return {};
+      });
+      if (data.token) {
+        sessionStorage.setItem(STORAGE_KEY, data.token);
+      }
+      var o = overlay();
+      if (o) {
+        o.classList.add('hidden');
+        o.setAttribute('aria-hidden', 'true');
+      }
+      window.dispatchEvent(new CustomEvent('dart-site-gate-ok'));
       return;
     }
-    var data = await r.json().catch(function () {
+    var err = await r.json().catch(function () {
       return {};
     });
-    showErr(data.error || 'Wrong password');
+    showErr(err.error || 'Wrong password');
   }
 
   function init() {

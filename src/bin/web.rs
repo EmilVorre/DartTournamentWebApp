@@ -2,13 +2,12 @@
 //! Run with: cargo run --bin web
 //! Listens on 0.0.0.0:8080 by default so the app is reachable via DNS on a VPS.
 //! Override with env: HOST (e.g. 0.0.0.0), PORT (e.g. 8080).
-//! Whole-site password gate (popup + cookie): correct password is `SITE_GATE_PLAIN` in this file.
-//! API routes (except health, static, `/api/site-gate/*`) require cookie after POST `/api/site-gate`.
+//! Whole-site password gate: correct password is `SITE_GATE_PLAIN` in this file.
+//! After POST `/api/site-gate`, the client stores the returned token (sessionStorage) and sends
+//! header `X-Dart-Site-Gate` on requests; no cookie (avoids browser cookie UI / SameSite quirks).
 
 use actix_files::Files;
 use actix_web::body::BoxBody;
-use actix_web::cookie::time::Duration as CookieDuration;
-use actix_web::cookie::{Cookie, SameSite};
 use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::middleware::{from_fn, Next};
 use actix_web::{
@@ -39,20 +38,22 @@ struct TournamentEntry {
 /// Plaintext site password (intentionally not secret for this deployment).
 const SITE_GATE_PLAIN: &str = "bøh";
 
-/// Whole-site gate: API routes require cookie `dart_site_gate` matching the hash of [`SITE_GATE_PLAIN`],
-/// except health, static files, and `/api/site-gate/*`.
+/// Expected value for `X-Dart-Site-Gate` (hex digest of password + salt), constant-time compared.
 #[derive(Clone)]
 struct SiteGate {
-    cookie_value: String,
+    expected_token: String,
 }
 
 impl SiteGate {
     fn new() -> Self {
         Self {
-            cookie_value: site_gate_token(SITE_GATE_PLAIN),
+            expected_token: site_gate_token(SITE_GATE_PLAIN),
         }
     }
 }
+
+/// Header the browser sends after successful `/api/site-gate` (must match JS `site-gate-temp.js`).
+const SITE_GATE_HEADER: &str = "x-dart-site-gate";
 
 fn site_gate_token(password: &str) -> String {
     let mut h = Sha256::new();
@@ -61,16 +62,18 @@ fn site_gate_token(password: &str) -> String {
     hex::encode(h.finalize())
 }
 
-fn site_gate_cookie_ok(req: &HttpRequest, gate: &SiteGate) -> bool {
-    let Some(c) = req.cookie("dart_site_gate") else {
+fn site_gate_header_ok(req: &HttpRequest, gate: &SiteGate) -> bool {
+    let Some(h) = req.headers().get(SITE_GATE_HEADER) else {
         return false;
     };
-    let expected = gate.cookie_value.as_str();
-    let v = c.value();
-    if v.len() != expected.len() {
+    let Ok(s) = h.to_str() else {
+        return false;
+    };
+    let expected = gate.expected_token.as_str();
+    if s.len() != expected.len() {
         return false;
     }
-    v.as_bytes().ct_eq(expected.as_bytes()).into()
+    s.as_bytes().ct_eq(expected.as_bytes()).into()
 }
 
 async fn site_gate_middleware(
@@ -89,10 +92,11 @@ async fn site_gate_middleware(
     let exempt = path == "/api/health"
         || path == "/favicon.ico"
         || path.starts_with("/static/")
+        || (path == "/" && method == actix_web::http::Method::GET)
         || (path == "/api/site-gate/check" && method == actix_web::http::Method::GET)
         || (path == "/api/site-gate" && method == actix_web::http::Method::POST);
 
-    if exempt || site_gate_cookie_ok(req.request(), &gate) {
+    if exempt || site_gate_header_ok(req.request(), &gate) {
         return next.call(req).await;
     }
 
@@ -190,32 +194,26 @@ async fn favicon() -> HttpResponse {
     HttpResponse::NoContent().finish()
 }
 
-/// Returns 204 if cookie is valid; 401 if password not entered yet.
+/// Returns 204 if `X-Dart-Site-Gate` matches; 401 if not unlocked yet.
 #[get("/api/site-gate/check")]
 async fn api_site_gate_check(req: HttpRequest, gate: web::Data<SiteGate>) -> HttpResponse {
-    if site_gate_cookie_ok(&req, gate.get_ref()) {
+    if site_gate_header_ok(&req, gate.get_ref()) {
         HttpResponse::NoContent().finish()
     } else {
         HttpResponse::Unauthorized().finish()
     }
 }
 
-/// POST JSON `{ "password": "..." }` — sets `dart_site_gate` cookie on success (must match [`SITE_GATE_PLAIN`]).
+/// POST JSON `{ "password": "..." }` — returns `{ "token": "<hex>" }` on success (must match [`SITE_GATE_PLAIN`]).
 #[post("/api/site-gate")]
 async fn api_site_gate_login(
     gate: web::Data<SiteGate>,
     body: Json<SiteGateLoginBody>,
 ) -> HttpResponse {
-    let expected = gate.cookie_value.as_str();
+    let expected = gate.expected_token.as_str();
     let got = site_gate_token(body.password.trim());
     if got.as_bytes().ct_eq(expected.as_bytes()).into() {
-        let cookie = Cookie::build("dart_site_gate", expected)
-            .path("/")
-            .http_only(true)
-            .same_site(SameSite::Lax)
-            .max_age(CookieDuration::days(30))
-            .finish();
-        HttpResponse::NoContent().cookie(cookie).finish()
+        HttpResponse::Ok().json(serde_json::json!({ "token": expected }))
     } else {
         HttpResponse::Unauthorized().json(serde_json::json!({ "error": "Wrong password" }))
     }

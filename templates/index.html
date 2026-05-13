@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
-  <!-- TEMP site-gate-temp: remove overlay + site-gate-temp.js + gate code in web.rs (SITE_GATE_PLAIN) -->
+  <!-- TEMP site-gate-temp: token in sessionStorage + X-Dart-Site-Gate (see site-gate-temp.js / web.rs) -->
   <div id="site-gate-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" aria-modal="true" role="dialog">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
       <h2 class="text-lg font-semibold text-slate-800 mb-2 text-center">Site password</h2>
@@ -1210,10 +1210,13 @@
       }
     }
 
+    window.addEventListener('dart-site-gate-ok', () => {
+      loadAndRender();
+    });
+
     function init() {
     try {
-    // Wait for site gate cookie before hitting /api/tournaments; otherwise 401 JSON hits
-    // showError() while the password overlay is still hidden (race with site-gate-temp.js).
+    // Wait for site gate token (sessionStorage + X-Dart-Site-Gate via patched fetch).
     (async function runWhenSiteGateOk() {
       const gate = await fetch('/api/site-gate/check', { credentials: 'same-origin' });
       if (gate.status !== 204) return;
