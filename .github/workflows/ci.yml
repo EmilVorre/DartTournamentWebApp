@@ -20,13 +20,13 @@ jobs:
 
   test:
     uses: EmilVorre/reuseable-workflows/.github/workflows/rust-test.yml@v1
-    needs: build
+    needs: lint
     with:
       rust-toolchain: stable
 
   package:
     uses: EmilVorre/reuseable-workflows/.github/workflows/rust-package.yml@v1
-    needs: test
+    needs: test && build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

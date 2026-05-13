@@ -1212,7 +1212,13 @@
 
     function init() {
     try {
-    loadAndRender();
+    // Wait for site gate cookie before hitting /api/tournaments; otherwise 401 JSON hits
+    // showError() while the password overlay is still hidden (race with site-gate-temp.js).
+    (async function runWhenSiteGateOk() {
+      const gate = await fetch('/api/site-gate/check', { credentials: 'same-origin' });
+      if (gate.status !== 204) return;
+      await loadAndRender();
+    })();
     const addPlayerBtn = document.getElementById('add-player-btn');
     const playerNameInput = document.getElementById('player-name-input');
     function doAddPlayer() {
