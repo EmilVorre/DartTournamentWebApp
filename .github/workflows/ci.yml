@@ -26,7 +26,7 @@ jobs:
 
   package:
     uses: EmilVorre/reuseable-workflows/.github/workflows/rust-package.yml@v1
-    needs: test && build
+    needs: [test, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
