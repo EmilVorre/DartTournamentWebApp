@@ -36,22 +36,23 @@ jobs:
       dockerfile-path: "./Dockerfile"
       image-name: dart-tournament-web
 
-  vars:
+  image-for-deploy:
     runs-on: ubuntu-latest
+    needs: package
     outputs:
-      image: ${{ steps.img.outputs.image }}
+      image: ${{ steps.ref.outputs.image }}
     steps:
-      - id: img
+      - id: ref
         run: |
           OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${OWNER}/dart-tournament-web:latest" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/${OWNER}/dart-tournament-web@${{ needs.package.outputs.image-digest }}" >> $GITHUB_OUTPUT
 
   deploy:
     uses: EmilVorre/reuseable-workflows/.github/workflows/k8s-deploy.yml@v1
-    needs: [package, vars]
+    needs: [package, image-for-deploy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     with:
-      image: ${{ needs.vars.outputs.image }}
+      image: ${{ needs.image-for-deploy.outputs.image }}
       deployment: dart
       container: dart
       namespace: dart
